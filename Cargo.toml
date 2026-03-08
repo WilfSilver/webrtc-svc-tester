@@ -1,0 +1,3 @@
+[workspace]
+members = ["sfu"]
+resolver = "3"
