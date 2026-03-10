@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "module": "es6",
-    "target": "es2018",
+    "module": "esnext",
+    "target": "es2024",
     "sourceMap": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitReturns": true,
@@ -13,7 +13,16 @@
     "strict": true,
     "noUnusedParameters": true,
     "noUnusedLocals": true,
-    "lib": ["es5", "es2015", "es2019", "dom"]
+    "lib": [
+      "es5",
+      "es2015",
+      "es2019",
+      "dom"
+    ]
   },
-  "include": ["src", ".eslintrc.js", "webpack.config.js"]
+  "include": [
+    "src",
+    ".eslintrc.js",
+    "webpack.config.js"
+  ]
 }

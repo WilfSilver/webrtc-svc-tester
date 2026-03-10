@@ -1,18 +1,17 @@
-/* eslint-disable no-console */
 import { Device, parseScalabilityMode } from "mediasoup-client";
 import type {
   MediaKind,
   RtpCapabilities,
+  RtpCodecCapability,
   RtpEncodingParameters,
   RtpParameters,
 } from "mediasoup-client/lib/RtpParameters";
 import type {
   DtlsParameters,
-  TransportOptions,
   Transport,
+  TransportOptions,
 } from "mediasoup-client/lib/Transport";
-import type { Consumer } from "mediasoup-client/lib/types";
-import type { ConsumerOptions } from "mediasoup-client/lib/Consumer";
+import type { AppData, Consumer, Producer } from "mediasoup-client/lib/types";
 
 type Brand<K, T> = K & { __brand: T };
 
@@ -102,331 +101,455 @@ type ClientMessage =
   | ClientConsumerResume
   | ClientSetConsumerPreferredLayers;
 
-async function init() {
-  const isFirefox = navigator.userAgent.toLowerCase().includes("firefox");
-  const sendPreview = document.querySelector(
-    "#preview-send",
-  ) as HTMLVideoElement;
-  const receivePreview = document.querySelector(
-    "#preview-receive",
-  ) as HTMLVideoElement;
-  const videoCodec = document.querySelector("#video-codec") as HTMLSpanElement;
-
-  sendPreview.onloadedmetadata = () => {
-    sendPreview.play();
-  };
-  receivePreview.onloadedmetadata = () => {
-    receivePreview.play();
-  };
-
-  const decreaseLayer = document.querySelector(
-    "#decreaseLayer",
-  ) as HTMLButtonElement;
-  const increaseLayer = document.querySelector(
-    "#increaseLayer",
-  ) as HTMLButtonElement;
-  const spatialLayerNode = document.querySelector(
-    "#spatial",
-  ) as HTMLSpanElement;
-  const temporalLayerNode = document.querySelector(
-    "#temporal",
-  ) as HTMLSpanElement;
-  temporalLayerNode.innerText = "none";
-
-  let videoConsumer: Consumer | null = null;
-  let maxSpatialLayer = 0;
-  let maxTemporalLayer = 0;
-  let preferredSpatialLayer = 0;
-  let preferredTemporalLayer = 0;
-
-  decreaseLayer.addEventListener("click", () => {
-    let newPreferredSpatialLayer: number;
-    let newPreferredTemporalLayer: number;
-
-    if (preferredTemporalLayer > 0) {
-      newPreferredSpatialLayer = preferredSpatialLayer;
-      newPreferredTemporalLayer = preferredTemporalLayer - 1;
-    } else if (preferredSpatialLayer > 0) {
-      newPreferredSpatialLayer = preferredSpatialLayer - 1;
-      newPreferredTemporalLayer = maxTemporalLayer;
-    } else {
-      newPreferredSpatialLayer = maxSpatialLayer;
-      newPreferredTemporalLayer = maxTemporalLayer;
-    }
-
-    setPreferredLayers(newPreferredSpatialLayer, newPreferredTemporalLayer);
-  });
-  increaseLayer.addEventListener("click", () => {
-    let newPreferredSpatialLayer: number;
-    let newPreferredTemporalLayer: number;
-
-    if (preferredTemporalLayer < 2) {
-      newPreferredSpatialLayer = preferredSpatialLayer;
-      newPreferredTemporalLayer = preferredTemporalLayer + 1;
-    } else if (preferredSpatialLayer < 2) {
-      newPreferredSpatialLayer = preferredSpatialLayer + 1;
-      newPreferredTemporalLayer = 0;
-    } else {
-      newPreferredSpatialLayer = 0;
-      newPreferredTemporalLayer = 0;
-    }
-
-    setPreferredLayers(newPreferredSpatialLayer, newPreferredTemporalLayer);
-  });
-
-  const setPreferredLayers = (
-    spatialLayer: number,
-    temporalLayer: number = 0,
-  ): void => {
-    if (!videoConsumer) {
-      throw new Error(
-        "Failed to update preferred layers: video consumer not found.",
-      );
-    }
-
-    preferredSpatialLayer = spatialLayer;
-    preferredTemporalLayer = temporalLayer;
-
-    spatialLayerNode.innerText = String(spatialLayer);
-    temporalLayerNode.innerText = String(temporalLayer);
-
-    send({
-      action: "SetConsumerPreferredLayers",
-      id: videoConsumer.id as ConsumerId,
-      preferredLayers: { spatialLayer, temporalLayer },
-    });
-  };
-
-  const receiveMediaStream = new MediaStream();
-
-  const ws = new WebSocket("ws://localhost:3000/ws");
-
-  function send(message: ClientMessage) {
-    ws.send(JSON.stringify(message));
-  }
-
-  const device = new Device();
-  let producerTransport: Transport | undefined;
-  let consumerTransport: Transport | undefined;
-
-  {
-    const waitingForResponse: Map<
-      ServerMessage["action"],
-      (consumerOptions: ConsumerOptions) => void
-    > = new Map();
-
-    ws.onmessage = async (message) => {
-      const decodedMessage: ServerMessage = JSON.parse(message.data);
-
-      switch (decodedMessage.action) {
-        case "Init": {
-          // It is expected that server will send initialization message right after
-          // WebSocket connection is established
-          await device.load({
-            routerRtpCapabilities: decodedMessage.routerRtpCapabilities,
-          });
-
-          // Send client-side initialization message back right away
-          send({
-            action: "Init",
-            rtpCapabilities: device.recvRtpCapabilities,
-          });
-
-          // Producer transport is needed to send audio and video to SFU
-          producerTransport = device.createSendTransport(
-            decodedMessage.producerTransportOptions,
-          );
-
-          producerTransport
-            .on("connect", ({ dtlsParameters }, success) => {
-              // Send request to establish producer transport connection
-              send({
-                action: "ConnectProducerTransport",
-                dtlsParameters,
-              });
-              // And wait for confirmation, but, obviously, no error handling,
-              // which you should definitely have in real-world applications
-              waitingForResponse.set("ConnectedProducerTransport", () => {
-                success();
-                console.log("Producer transport connected");
-              });
-            })
-            .on("produce", ({ kind, rtpParameters }, success) => {
-              // Once connection is established, send request to produce
-              // audio or video track
-              send({
-                action: "Produce",
-                kind,
-                rtpParameters,
-              });
-              // And wait for confirmation, but, obviously, no error handling,
-              // which you should definitely have in real-world applications
-              waitingForResponse.set("Produced", ({ id }: ConsumerOptions) => {
-                success({ id });
-              });
-            });
-
-          // Request microphone and camera access, in real-world apps you may want
-          // to do this separately so that audio-only and video-only cases are
-          // handled nicely instead of failing completely
-          const mediaStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: {
-              width: {
-                ideal: 1280,
-              },
-              height: {
-                ideal: 720,
-              },
-              frameRate: {
-                ideal: 60,
-              },
-            },
-          });
-
-          sendPreview.srcObject = mediaStream;
-
-          const producers = [];
-
-          // And create producers for all tracks that were previously requested
-          for (const track of mediaStream.getTracks()) {
-            const codec =
-              track.kind === "video"
-                ? (device.recvRtpCapabilities.codecs?.find((codec) => {
-                    // Firefox supports VP9, but not SVC
-                    return (
-                      codec.mimeType.toLowerCase() === "video/vp9" && !isFirefox
-                    );
-                  }) ??
-                  device.recvRtpCapabilities.codecs?.find(
-                    (codec) => codec.mimeType.toLowerCase() === "video/vp8",
-                  ))
-                : undefined;
-            if (track.kind === "video") {
-              videoCodec.innerText = codec?.mimeType?.split("/")[1] ?? "?";
-            }
-
-            let encodings: RtpEncodingParameters[] | undefined = undefined;
-            if (codec?.mimeType.toLowerCase() === "video/vp8") {
-              encodings = [
-                { scaleResolutionDownBy: 4, maxBitrate: 500000 },
-                { scaleResolutionDownBy: 2, maxBitrate: 1000000 },
-                { scaleResolutionDownBy: 1, maxBitrate: 5000000 },
-              ];
-            } else if (codec?.mimeType.toLowerCase() === "video/vp9") {
-              encodings = [{ scalabilityMode: "S3T3" }];
-            }
-
-            const producer = await producerTransport.produce({
-              track,
-              encodings,
-              codec,
-            });
-
-            producers.push(producer);
-            console.log(`${track.kind} producer created:`, producer);
-          }
-
-          // Consumer transport is now needed to receive previously produced
-          // tracks back
-          consumerTransport = device.createRecvTransport(
-            decodedMessage.consumerTransportOptions,
-          );
-
-          consumerTransport.on("connect", ({ dtlsParameters }, success) => {
-            // Send request to establish consumer transport connection
-            send({
-              action: "ConnectConsumerTransport",
-              dtlsParameters,
-            });
-            // And wait for confirmation, but, obviously, no error handling,
-            // which you should definitely have in real-world applications
-            waitingForResponse.set("ConnectedConsumerTransport", () => {
-              success();
-              console.log("Consumer transport connected");
-            });
-          });
-
-          // For simplicity of this example producers were stored in an array
-          // and are now all consumed one at a time
-          for (const producer of producers) {
-            await new Promise((resolve) => {
-              // Send request to consume producer
-              send({
-                action: "Consume",
-                producerId: producer.id as ProducerId,
-              });
-              // And wait for confirmation, but, obviously, no error handling,
-              // which you should definitely have in real-world applications
-              waitingForResponse.set(
-                "Consumed",
-                async (consumerOptions: ConsumerOptions) => {
-                  // Once confirmation is received, corresponding consumer
-                  // can be created client-side
-                  const consumer = await (
-                    consumerTransport as Transport
-                  ).consume(consumerOptions);
-
-                  console.log(`${consumer.kind} consumer created:`, consumer);
-
-                  // Consumer needs to be resumed after being created in
-                  // paused state (see official documentation about why:
-                  // https://mediasoup.org/documentation/v3/mediasoup/api/#transport-consume)
-                  send({
-                    action: "ConsumerResume",
-                    id: consumer.id as ConsumerId,
-                  });
-
-                  receiveMediaStream.addTrack(consumer.track);
-                  receivePreview.srcObject = receiveMediaStream;
-
-                  if (consumer.kind === "video") {
-                    videoConsumer = consumer;
-
-                    const encodings =
-                      videoConsumer.rtpParameters.encodings ?? [];
-
-                    if (encodings[0]) {
-                      const scalabilityMode = parseScalabilityMode(
-                        encodings[0].scalabilityMode,
-                      );
-
-                      maxSpatialLayer = scalabilityMode.spatialLayers - 1;
-                      maxTemporalLayer = scalabilityMode.temporalLayers - 1;
-                      preferredSpatialLayer = maxSpatialLayer;
-                      preferredTemporalLayer = maxTemporalLayer;
-
-                      setPreferredLayers(
-                        preferredSpatialLayer,
-                        preferredTemporalLayer,
-                      );
-                    }
-                  }
-
-                  resolve(undefined);
-                },
-              );
-            });
-          }
-
-          break;
-        }
-        default: {
-          // All messages other than initialization go here and are assumed
-          // to be notifications that correspond to previously sent requests
-          const callback = waitingForResponse.get(decodedMessage.action);
-
-          if (callback) {
-            waitingForResponse.delete(decodedMessage.action);
-            callback(decodedMessage as unknown as ConsumerOptions);
-          } else {
-            console.error("Received unexpected message", decodedMessage);
-          }
-        }
-      }
-    };
-  }
-  ws.onerror = console.error;
+function getVideoCodec(): HTMLSpanElement {
+  return document.querySelector("#video-codec") as HTMLSpanElement;
 }
 
-init();
+function isFirefox(): boolean {
+  return navigator.userAgent.toLowerCase().includes("firefox");
+}
+
+class LayerCtrl {
+  private ctrl: ConsumerCtrl;
+
+  maxSpatial: number;
+  maxTemporal: number;
+  spatial: number;
+  temporal: number;
+
+  decreaseBtn: HTMLButtonElement;
+  increaseBtn: HTMLButtonElement;
+
+  constructor(stream: ConsumerCtrl, maxSpatial: number, maxTemporal: number) {
+    console.info(`Initialising Layer control (${maxSpatial}, ${maxTemporal})`);
+    this.ctrl = stream;
+
+    this.maxSpatial = maxSpatial + 1;
+    this.maxTemporal = maxTemporal + 1;
+
+    this.spatial = maxSpatial;
+    this.temporal = maxTemporal;
+
+    this.decreaseBtn = document.getElementById(
+      "decrease-layer",
+    ) as HTMLButtonElement;
+    this.decreaseBtn.onclick = () => this.decrease();
+    this.increaseBtn = document.getElementById(
+      "increase-layer",
+    ) as HTMLButtonElement;
+    this.increaseBtn.onclick = () => this.increase();
+
+    this.updateStream();
+  }
+
+  decrease() {
+    this.temporal--;
+    if (this.temporal < 0) {
+      this.temporal += this.maxTemporal;
+
+      this.spatial--;
+      if (this.spatial < 0) this.spatial += this.maxSpatial;
+    }
+
+    this.updateStream();
+  }
+
+  increase() {
+    this.temporal = (this.temporal + 1) % this.maxTemporal;
+    if (this.temporal === 0) {
+      this.spatial = (this.spatial + 1) % this.maxSpatial;
+    }
+
+    this.updateStream();
+  }
+
+  /**
+   * Sends an update to the stream with the new information
+   */
+  private updateStream() {
+    this.getSpatialSpan().innerText = String(this.spatial);
+    this.getTemporalSpan().innerText = String(this.temporal);
+    this.ctrl.setPreferredLayers(this.spatial, this.temporal);
+  }
+
+  private getSpatialSpan(): HTMLSpanElement {
+    return document.getElementById("spatial") as HTMLSpanElement;
+  }
+
+  private getTemporalSpan(): HTMLSpanElement {
+    return document.getElementById("temporal") as HTMLSpanElement;
+  }
+}
+
+class VideoPreview {
+  elem: HTMLVideoElement;
+
+  constructor(elem: HTMLVideoElement) {
+    this.elem = elem;
+
+    this.elem.onloadedmetadata = () => {
+      this.elem.play();
+    };
+
+    console.info(`Initialised ${this.elem.id}`);
+  }
+
+  static fromId(id: string): VideoPreview {
+    return new VideoPreview(document.getElementById(id) as HTMLVideoElement);
+  }
+
+  setSrc(src: MediaStream) {
+    this.elem.srcObject = src;
+  }
+}
+
+class ProducerCtrl {
+  preview: VideoPreview;
+
+  server: ServerCtrl;
+  device: Device;
+  transport?: Transport;
+
+  producers: Producer<AppData>[];
+
+  constructor(server: ServerCtrl, device: Device) {
+    this.server = server;
+    this.device = device;
+    this.producers = [];
+    this.preview = VideoPreview.fromId("preview-send");
+  }
+
+  async handle(message: ServerMessage): Promise<boolean> {
+    switch (message.action) {
+      case "Init": {
+        console.debug("Initialising ProducerCtrl");
+        await this.device.load({
+          routerRtpCapabilities: message.routerRtpCapabilities,
+        });
+
+        // Send client-side initialization message back right away
+        this.server.send({
+          action: "Init",
+          rtpCapabilities: this.device.recvRtpCapabilities,
+        });
+
+        this.transport = this.device.createSendTransport(
+          message.producerTransportOptions,
+        );
+
+        this.transport
+          .on("connect", ({ dtlsParameters }, success) => {
+            this.server.send({
+              action: "ConnectProducerTransport",
+              dtlsParameters,
+            });
+            this.server.waitFor("ConnectedProducerTransport", () => {
+              success();
+              console.log("Producer transport connected");
+            });
+          })
+          .on("produce", ({ kind, rtpParameters }, success) => {
+            this.server.send({
+              action: "Produce",
+              kind,
+              rtpParameters,
+            });
+
+            this.server.waitFor("Produced", ({ id }: ServerProduced) => {
+              success({ id });
+            });
+          });
+
+        await this.initStream();
+
+        break;
+      }
+    }
+
+    return false;
+  }
+
+  private async initStream() {
+    if (this.producers.length > 0) {
+      throw Error("Producers have already been initialised");
+    }
+
+    console.info("Initialising producer stream");
+
+    // Request microphone and camera access, in real-world apps you may want
+    // to do this separately so that audio-only and video-only cases are
+    // handled nicely instead of failing completely
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: {
+        width: {
+          ideal: 1280,
+        },
+        height: {
+          ideal: 720,
+        },
+        frameRate: {
+          ideal: 60,
+        },
+      },
+    });
+
+    this.preview.setSrc(mediaStream);
+
+    // And create producers for all tracks that were previously requested
+    for (const track of mediaStream.getTracks()) {
+      let encodings: RtpEncodingParameters[] | undefined;
+      let codec: RtpCodecCapability | undefined;
+
+      if (track.kind === "video") {
+        codec = this.chooseCodec();
+        if (!codec) {
+          throw Error("Could not find suitable codec!!");
+        }
+        console.info("Chosen codec:", codec);
+
+        getVideoCodec().innerText = codec.mimeType?.split("/")[1] ?? "?";
+
+        if (codec.mimeType.toLowerCase() === "video/vp8") {
+          encodings = [
+            { scaleResolutionDownBy: 4, maxBitrate: 500000 },
+            { scaleResolutionDownBy: 2, maxBitrate: 1000000 },
+            { scaleResolutionDownBy: 1, maxBitrate: 5000000 },
+          ];
+        } else if (
+          ["video/vp9", "video/av1"].includes(codec.mimeType.toLowerCase())
+        ) {
+          encodings = [{ scalabilityMode: "S3T3" }];
+        }
+      }
+
+      const producer = await this.transport?.produce({
+        track,
+        encodings,
+        codec,
+      });
+
+      if (producer) {
+        this.producers.push(producer);
+      }
+      console.info(`${track.kind} producer created:`, producer);
+    }
+  }
+
+  private chooseCodec(): RtpCodecCapability | undefined {
+    console.debug("Supported codecs: ", this.device.recvRtpCapabilities.codecs)
+    return (
+      this.device.recvRtpCapabilities.codecs?.find((codec) => {
+        // Firefox supports VP9, but not SVC
+        return codec.mimeType.toLowerCase() === "video/vp9" && !isFirefox();
+      }) ??
+      this.device.recvRtpCapabilities.codecs?.find(
+        (codec) => codec.mimeType.toLowerCase() === "video/vp8",
+      )
+    );
+  }
+}
+
+class ConsumerCtrl {
+  server: ServerCtrl;
+
+  device: Device;
+  transport?: Transport;
+
+  preview: VideoPreview;
+  layer?: LayerCtrl;
+  inner?: Consumer;
+
+  constructor(server: ServerCtrl, device: Device) {
+    this.server = server;
+    this.device = device;
+    this.preview = VideoPreview.fromId("preview-receive");
+  }
+
+  async handle(message: ServerMessage): Promise<boolean> {
+    switch (message.action) {
+      case "Init": {
+        console.info("Initialising Consumer");
+
+        this.transport = this.device.createRecvTransport(
+          message.consumerTransportOptions,
+        );
+
+        this.transport.on("connect", ({ dtlsParameters }, success) => {
+          this.server.send({
+            action: "ConnectConsumerTransport",
+            dtlsParameters,
+          });
+          this.server.waitFor("ConnectedConsumerTransport", () => {
+            success();
+            console.log("Consumer transport connected");
+          });
+        });
+
+        await this.consumeAll(this.server.producer.producers);
+        break;
+      }
+    }
+
+    return false;
+  }
+
+  setPreferredLayers(spatialLayer: number, temporalLayer: number) {
+    this.checkConsumer("to update preferred layers");
+
+    this.server.send({
+      action: "SetConsumerPreferredLayers",
+      id: this.inner?.id as ConsumerId,
+      preferredLayers: { spatialLayer, temporalLayer },
+    });
+  }
+
+  private checkConsumer(ctx: string) {
+    if (!this.inner) {
+      throw new Error(`Failed ${ctx}: video consumer not found.`);
+    }
+  }
+
+  private async consumeAll(producers: Producer<AppData>[]) {
+    const transport = this.transport;
+    if (!transport) {
+      throw Error("Transport was not initialised");
+    }
+    console.log("Consuming all producers", producers);
+
+    const stream = new MediaStream();
+
+    // For simplicity of this example producers were stored in an array
+    // and are now all consumed one at a time
+    for (const producer of producers) {
+      await new Promise((resolve) => {
+        // Send request to consume producer
+        this.server.send({
+          action: "Consume",
+          producerId: producer.id as ProducerId,
+        });
+
+        // And wait for confirmation, but, obviously, no error handling,
+        // which you should definitely have in real-world applications
+        this.server.waitFor("Consumed", async (message: ServerConsumed) => {
+          // Once confirmation is received, corresponding consumer
+          // can be created client-side
+          const consumer = await transport.consume({
+            id: message.id,
+            kind: message.kind,
+            rtpParameters: message.rtpParameters,
+            producerId: producer.id,
+          });
+
+          console.info(`${consumer?.kind} consumer created:`, consumer);
+
+          // Consumer needs to be resumed after being created in
+          // paused state (see official documentation about why:
+          // https://mediasoup.org/documentation/v3/mediasoup/api/#transport-consume)
+          this.server.send({
+            action: "ConsumerResume",
+            id: consumer?.id as ConsumerId,
+          });
+
+          stream.addTrack(consumer?.track);
+          this.preview.setSrc(stream);
+
+          if (consumer.kind === "video") {
+            this.inner = consumer;
+
+            const encodings = this.inner.rtpParameters.encodings ?? [];
+
+            if (encodings[0]) {
+              const scalabilityMode = parseScalabilityMode(
+                encodings[0].scalabilityMode,
+              );
+
+              this.layer = new LayerCtrl(
+                this,
+                scalabilityMode.spatialLayers,
+                scalabilityMode.temporalLayers,
+              );
+            }
+          }
+
+          resolve(undefined);
+        });
+      });
+    }
+  }
+}
+
+class ServerCtrl {
+  static #instance: ServerCtrl;
+
+  ws: WebSocket;
+
+  waitingForResponse: Map<
+    ServerMessage["action"],
+    (message: ServerMessage) => void
+  >;
+
+  consumer: ConsumerCtrl;
+  producer: ProducerCtrl;
+
+  constructor() {
+    console.info("Initiating websocket");
+    this.ws = new WebSocket("ws://localhost:3000/ws");
+
+    this.ws.onmessage = async (message) => {
+      const decodedMessage: ServerMessage = JSON.parse(message.data);
+      this.handle(decodedMessage);
+    };
+
+    this.ws.onerror = console.error;
+
+    this.waitingForResponse = new Map();
+
+    const device = new Device();
+    this.consumer = new ConsumerCtrl(this, device);
+    this.producer = new ProducerCtrl(this, device);
+  }
+
+  public static get instance(): ServerCtrl {
+    if (!ServerCtrl.#instance) {
+      ServerCtrl.#instance = new ServerCtrl();
+    }
+
+    return ServerCtrl.#instance;
+  }
+
+  send(message: ClientMessage) {
+    console.debug("Sending", message);
+    this.ws.send(JSON.stringify(message));
+  }
+
+  waitFor<T extends ServerMessage>(
+    action: T["action"],
+    callback: (message: T) => void,
+  ) {
+    console.debug(`Waiting for ${action}`);
+    this.waitingForResponse.set(
+      action,
+      callback as (message: ServerMessage) => void,
+    );
+  }
+
+  async handle(message: ServerMessage): Promise<boolean> {
+    console.debug("Received: ", message);
+
+    if (await this.producer.handle(message)) return true;
+    if (await this.consumer.handle(message)) return true;
+
+    const callback = this.waitingForResponse.get(message.action);
+
+    if (callback) {
+      this.waitingForResponse.delete(message.action);
+      console.debug(`Calling back for ${message.action}`);
+      callback(message);
+    }
+
+    return false;
+  }
+}
+
+ServerCtrl.instance;

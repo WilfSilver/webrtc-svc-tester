@@ -5,7 +5,7 @@
   "scripts": {
     "start": "webpack serve"
   },
-  "author": "Tarsis Maksym <tarsis.maksym@gmail.com>",
+  "author": "Wilf Silver <git@wilfsilver.co.uk>",
   "dependencies": {
     "mediasoup-client": "^3.6.51"
   },
