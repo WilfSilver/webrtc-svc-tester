@@ -203,6 +203,69 @@ class VideoPreview {
   }
 }
 
+/**
+ * Code heavily inspired by: https://github.com/versatica/mediasoup-demo
+ */
+class E2E {
+  worker: Worker;
+  key: string;
+  useOffset: boolean;
+
+  constructor(key: string, useOffset: boolean = true) {
+    const stream = new ReadableStream();
+
+    this.key = key;
+    this.useOffset = useOffset;
+
+    window.postMessage(stream, "*", [stream]);
+    this.worker = new Worker("/js/e2e-worker.js", { name: "e2e worker" });
+
+    console.info("Setup E2EE worker");
+
+    this.worker.postMessage({
+      operation: "setCryptoKey",
+      currentCryptoKey: key,
+      useCryptoOffset: this.useOffset,
+    });
+  }
+
+  setupSenderTransform(sender: RTCRtpSender) {
+    // @ts-ignore
+    const senderStreams = sender.createEncodedStreams();
+    const readableStream =
+      senderStreams.readable || senderStreams.readableStream;
+    const writableStream =
+      senderStreams.writable || senderStreams.writableStream;
+
+    this.worker.postMessage(
+      {
+        operation: "encode",
+        readableStream,
+        writableStream,
+      },
+      [readableStream, writableStream],
+    );
+  }
+
+  setupReceiverTransform(receiver: RTCRtpReceiver) {
+    // @ts-ignore
+    const receiverStreams = receiver.createEncodedStreams();
+    const readableStream =
+      receiverStreams.readable || receiverStreams.readableStream;
+    const writableStream =
+      receiverStreams.writable || receiverStreams.writableStream;
+
+    this.worker.postMessage(
+      {
+        operation: "decode",
+        readableStream,
+        writableStream,
+      },
+      [readableStream, writableStream],
+    );
+  }
+}
+
 class ProducerCtrl {
   preview: VideoPreview;
 
@@ -233,9 +296,13 @@ class ProducerCtrl {
           rtpCapabilities: this.device.recvRtpCapabilities,
         });
 
-        this.transport = this.device.createSendTransport(
-          message.producerTransportOptions,
-        );
+        this.transport = this.device.createSendTransport({
+          ...message.producerTransportOptions,
+          additionalSettings: {
+            // @ts-ignore
+            encodedInsertableStreams: true,
+          },
+        });
 
         this.transport
           .on("connect", ({ dtlsParameters }, success) => {
@@ -330,6 +397,9 @@ class ProducerCtrl {
       });
 
       if (producer) {
+        if (producer.rtpSender)
+          this.server.e2e.setupSenderTransform(producer.rtpSender);
+
         this.producers.push(producer);
       }
       console.info(`${track.kind} producer created:`, producer);
@@ -337,7 +407,7 @@ class ProducerCtrl {
   }
 
   private chooseCodec(): RtpCodecCapability | undefined {
-    console.debug("Supported codecs: ", this.device.recvRtpCapabilities.codecs)
+    console.debug("Supported codecs: ", this.device.recvRtpCapabilities.codecs);
     return (
       this.device.recvRtpCapabilities.codecs?.find((codec) => {
         // Firefox supports VP9, but not SVC
@@ -371,9 +441,13 @@ class ConsumerCtrl {
       case "Init": {
         console.info("Initialising Consumer");
 
-        this.transport = this.device.createRecvTransport(
-          message.consumerTransportOptions,
-        );
+        this.transport = this.device.createRecvTransport({
+          ...message.consumerTransportOptions,
+          additionalSettings: {
+            // @ts-ignore
+            encodedInsertableStreams: true,
+          },
+        });
 
         this.transport.on("connect", ({ dtlsParameters }, success) => {
           this.server.send({
@@ -441,6 +515,9 @@ class ConsumerCtrl {
             producerId: producer.id,
           });
 
+          if (consumer.rtpReceiver)
+            this.server.e2e.setupReceiverTransform(consumer.rtpReceiver);
+
           console.info(`${consumer?.kind} consumer created:`, consumer);
 
           // Consumer needs to be resumed after being created in
@@ -492,7 +569,11 @@ class ServerCtrl {
   consumer: ConsumerCtrl;
   producer: ProducerCtrl;
 
+  e2e: E2E;
+
   constructor() {
+    this.e2e = new E2E("examplekey");
+
     console.info("Initiating websocket");
     this.ws = new WebSocket("ws://localhost:3000/ws");
 

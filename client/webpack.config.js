@@ -1,4 +1,5 @@
 const path = require("node:path");
+const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   mode: "development",
@@ -16,7 +17,7 @@ module.exports = {
     extensions: [".ts", ".js"],
   },
   output: {
-    filename: "dist/bundle.js",
+    filename: "bundle.js",
     path: path.resolve(__dirname, "dist"),
   },
   devServer: {
@@ -26,4 +27,9 @@ module.exports = {
       directory: __dirname,
     },
   },
+  plugins: [
+    new CopyPlugin({
+      patterns: [{ from: "public" }],
+    }),
+  ],
 };
