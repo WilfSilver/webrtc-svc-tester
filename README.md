@@ -4,6 +4,10 @@ This code is a work in progress building towards creating a basic E2EE video cal
 
 Code was originally taken from the [mediasoup's example directories](https://github.com/versatica/mediasoup/tree/v3/rust/examples).
 
+## Supported Browsers
+
+This only works on chromium based browsers > 86 due to the use of `RTCRtpSender.createEncodedStreams`, see [mozilla's RTCRtpSender documentation](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpSender).
+
 ## Setup
 
 To install dependencies:

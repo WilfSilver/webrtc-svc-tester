@@ -14,15 +14,18 @@
     "noUnusedParameters": true,
     "noUnusedLocals": true,
     "lib": [
-      "es5",
-      "es2015",
-      "es2019",
-      "dom"
+      "es2024",
+      "DOM.Iterable",
+      "DOM"
     ]
   },
   "include": [
-    "src",
+    "src/index.ts",
+    "src/shared/**/*",
     ".eslintrc.js",
     "webpack.config.js"
+  ],
+  "exclude": [
+    "src/workers/**/*"
   ]
 }

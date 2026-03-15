@@ -3,7 +3,10 @@ const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
   mode: "development",
-  entry: "./src/index.ts",
+  entry: {
+    index: "./src/index.ts",
+    "e2e-worker": "./src/workers/e2e.worker.ts",
+  },
   module: {
     rules: [
       {
@@ -17,7 +20,7 @@ module.exports = {
     extensions: [".ts", ".js"],
   },
   output: {
-    filename: "bundle.js",
+    filename: "[name].js",
     path: path.resolve(__dirname, "dist"),
   },
   devServer: {

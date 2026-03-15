@@ -1,3 +1,4 @@
+import { randomBytes } from "@noble/ciphers/utils.js";
 import { Device, parseScalabilityMode } from "mediasoup-client";
 import type {
   MediaKind,
@@ -12,6 +13,7 @@ import type {
   TransportOptions,
 } from "mediasoup-client/lib/Transport";
 import type { AppData, Consumer, Producer } from "mediasoup-client/lib/types";
+import type { DecodeStream, EncodeStream, SetCryptoKey } from "./shared/types";
 
 type Brand<K, T> = K & { __brand: T };
 
@@ -204,21 +206,21 @@ class VideoPreview {
 }
 
 /**
- * Code heavily inspired by: https://github.com/versatica/mediasoup-demo
+ * Code heavily inspired by: https://github.com/versatica/mediasoup-demo/blob/v3/app/src/e2e.js
  */
 class E2E {
   worker: Worker;
-  key: string;
+  key: Uint8Array;
   useOffset: boolean;
 
-  constructor(key: string, useOffset: boolean = true) {
+  constructor(key: Uint8Array, useOffset: boolean = true) {
     const stream = new ReadableStream();
 
     this.key = key;
     this.useOffset = useOffset;
 
     window.postMessage(stream, "*", [stream]);
-    this.worker = new Worker("/js/e2e-worker.js", { name: "e2e worker" });
+    this.worker = new Worker("/e2e-worker.js", { name: "e2e worker" });
 
     console.info("Setup E2EE worker");
 
@@ -226,7 +228,11 @@ class E2E {
       operation: "setCryptoKey",
       currentCryptoKey: key,
       useCryptoOffset: this.useOffset,
-    });
+    } as SetCryptoKey);
+  }
+
+  static newWithRandomKey(useOffset: boolean = true): E2E {
+    return new E2E(randomBytes(32), useOffset);
   }
 
   setupSenderTransform(sender: RTCRtpSender) {
@@ -242,7 +248,7 @@ class E2E {
         operation: "encode",
         readableStream,
         writableStream,
-      },
+      } as EncodeStream,
       [readableStream, writableStream],
     );
   }
@@ -260,7 +266,7 @@ class E2E {
         operation: "decode",
         readableStream,
         writableStream,
-      },
+      } as DecodeStream,
       [readableStream, writableStream],
     );
   }
@@ -557,8 +563,6 @@ class ConsumerCtrl {
 }
 
 class ServerCtrl {
-  static #instance: ServerCtrl;
-
   ws: WebSocket;
 
   waitingForResponse: Map<
@@ -572,7 +576,7 @@ class ServerCtrl {
   e2e: E2E;
 
   constructor() {
-    this.e2e = new E2E("examplekey");
+    this.e2e = E2E.newWithRandomKey();
 
     console.info("Initiating websocket");
     this.ws = new WebSocket("ws://localhost:3000/ws");
@@ -589,14 +593,6 @@ class ServerCtrl {
     const device = new Device();
     this.consumer = new ConsumerCtrl(this, device);
     this.producer = new ProducerCtrl(this, device);
-  }
-
-  public static get instance(): ServerCtrl {
-    if (!ServerCtrl.#instance) {
-      ServerCtrl.#instance = new ServerCtrl();
-    }
-
-    return ServerCtrl.#instance;
   }
 
   send(message: ClientMessage) {
@@ -633,4 +629,5 @@ class ServerCtrl {
   }
 }
 
-ServerCtrl.instance;
+declare var serverCtrl: ServerCtrl;
+serverCtrl = new ServerCtrl();

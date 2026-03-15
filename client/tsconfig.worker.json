@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "sourceRoot": "src/workers",
+    "baseUrl": "src/workers",
+    "outDir": "dist/workers",
+    "lib": [
+      "es2024",
+      "WebWorker"
+    ]
+  },
+  "include": [
+    "src/shared/**/*",
+    "src/workers/**/*"
+  ]
+}
