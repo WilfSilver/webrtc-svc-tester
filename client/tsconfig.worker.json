@@ -4,13 +4,7 @@
     "sourceRoot": "src/workers",
     "baseUrl": "src/workers",
     "outDir": "dist/workers",
-    "lib": [
-      "es2024",
-      "WebWorker"
-    ]
+    "lib": ["es2024", "WebWorker"]
   },
-  "include": [
-    "src/shared/**/*",
-    "src/workers/**/*"
-  ]
+  "include": ["src/shared/**/*", "src/workers/**/*"]
 }

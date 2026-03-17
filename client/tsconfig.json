@@ -8,24 +8,21 @@
     "moduleResolution": "node",
     "allowSyntheticDefaultImports": false,
     "sourceRoot": "src",
-    "baseUrl": "src",
+    "baseUrl": ".",
     "outDir": "dist",
     "strict": true,
     "noUnusedParameters": true,
     "noUnusedLocals": true,
-    "lib": [
-      "es2024",
-      "DOM.Iterable",
-      "DOM"
-    ]
+    "lib": ["es2024", "DOM.Iterable", "DOM"],
+    "paths": {
+      "@src/*": ["src/*"]
+    }
   },
   "include": [
-    "src/index.ts",
-    "src/client.ts",
     "src/shared/**/*",
+    "src/dom/**/*",
+    "src/lib/**/*",
     "webpack.config.js"
   ],
-  "exclude": [
-    "src/workers/**/*"
-  ]
+  "exclude": ["src/workers/**/*"]
 }

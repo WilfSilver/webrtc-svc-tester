@@ -6,16 +6,13 @@ export interface SetCryptoKey {
 
 export type EncodedFrame = RTCEncodedVideoFrame | RTCEncodedAudioFrame;
 
-export interface EncodeStream {
-  operation: "encode";
-  readableStream: ReadableStream<EncodedFrame>;
-  writableStream: WritableStream<EncodedFrame>;
+export type CryptoWorkerMessage = SetCryptoKey;
+
+export enum TransformDir {
+  Sender = "sender",
+  Receiver = "reciever",
 }
 
-export interface DecodeStream {
-  operation: "decode";
-  readableStream: ReadableStream<EncodedFrame>;
-  writableStream: WritableStream<EncodedFrame>;
+export interface E2EWorkerOptions {
+  dir: TransformDir;
 }
-
-export type CryptoWorkerMessage = SetCryptoKey | EncodeStream | DecodeStream;
