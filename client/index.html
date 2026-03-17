@@ -1,48 +1,55 @@
 <!doctype html>
-<style>
-    body {
-        margin: 0;
-    }
+<html>
+  <head>
+    <meta charset="UTF-8" />
 
-    #container {
-        display: flex;
-        flex-direction: column;
-    }
+    <style>
+        body {
+            margin: 0;
+        }
 
-    figure {
-        margin: 0;
-        width: 50vw;
-    }
+        #container {
+            display: flex;
+            flex-direction: column;
+        }
 
-    video {
-        max-width: 100%;
-    }
+        figure {
+            margin: 0;
+            width: 50vw;
+        }
 
-    .previews {
-        display: flex;
-    }
-</style>
-<div id="container">
-    <div class="previews">
+        video {
+            max-width: 100%;
+        }
+
+        .previews {
+            display: flex;
+        }
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <div class="previews">
         <figure>
-            <video id="preview-send" muted controls></video>
-            <figcaption>Send preview</figcaption>
+          <video id="preview-send" muted controls></video>
+          <figcaption>Send preview</figcaption>
         </figure>
         <figure>
-            <video id="preview-receive" muted controls></video>
-            <figcaption>Receive preview</figcaption>
+          <video id="preview-receive" muted controls></video>
+          <figcaption>Receive preview</figcaption>
         </figure>
-    </div>
+      </div>
 
-    <p>
+      <p>
         Video codec: <span id="video-codec">?</span>
-    </p>
-    <div>
+      </p>
+      <div>
         Switch layers: <button id="decrease-layer" type="button">down</button>
         S<span id="spatial">?</span>T<span id="temporal">?</span>
         <button id="increase-layer" type="button">up</button>
+      </div>
     </div>
-</div>
-<script src="index.js">
 
-</script>
+    <script type="module" src="src/client.ts"> </script>
+  </body>
+</html>

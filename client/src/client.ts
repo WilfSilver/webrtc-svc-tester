@@ -220,7 +220,10 @@ class E2E {
     this.useOffset = useOffset;
 
     window.postMessage(stream, "*", [stream]);
-    this.worker = new Worker("/e2e-worker.js", { name: "e2e worker" });
+    this.worker = new Worker("/src/workers/e2e.worker.ts", {
+      type: "module",
+      name: "e2e worker",
+    });
 
     console.info("Setup E2EE worker");
 

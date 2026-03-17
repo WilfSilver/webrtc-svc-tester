@@ -21,8 +21,8 @@
   },
   "include": [
     "src/index.ts",
+    "src/client.ts",
     "src/shared/**/*",
-    ".eslintrc.js",
     "webpack.config.js"
   ],
   "exclude": [
