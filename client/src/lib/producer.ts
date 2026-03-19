@@ -6,7 +6,7 @@ import type {
   Transport,
 } from "mediasoup-client/lib/types";
 import type { API, ServerInit } from "./api";
-import { DeviceWrapper } from "./device";
+import { DeviceWrapper, type VideoCodecMimeType } from "./device";
 import type { E2EWorker } from "./e2e_manager";
 
 /**
@@ -60,8 +60,8 @@ export class ProducerStream {
   device: DeviceWrapper;
 
   type: EncodingType;
+  codec: VideoCodecMimeType;
 
-  onChosenCodec: ((codec: RtpCodecCapability) => void)[];
   onNewProducer: ((producer: Producer<AppData>) => void)[];
   producers: Producer<AppData>[];
 
@@ -78,19 +78,20 @@ export class ProducerStream {
   constructor(
     api: API,
     device: DeviceWrapper | undefined,
-    type: EncodingType = EncodingType.Simulcast,
+    codec: VideoCodecMimeType = "video/vp9",
+    type: EncodingType = EncodingType.SVC,
   ) {
     if (!device) device = new DeviceWrapper(api);
 
     this.device = device;
 
     this.type = type;
+    this.codec = codec;
 
     this.api = api;
     this.producers = [];
 
     this.onNewProducer = [];
-    this.onChosenCodec = [];
 
     this.api.waitFor("Init", (msg: ServerInit) => this.init(msg), false);
   }
@@ -158,16 +159,6 @@ export class ProducerStream {
   }
 
   /**
-   * Adds a new listener for when a codec get's chosen for the video
-   * during {@linkcode connectStream}.
-   *
-   * @param cb The function to be called with the chosen codec
-   */
-  addOnChosenCodec(cb: (codec: RtpCodecCapability) => void) {
-    this.onChosenCodec.push(cb);
-  }
-
-  /**
    * Connects a given {@linkcode MediaStream} to the transport, creating
    * all producers required to send the tracks.
    *
@@ -190,17 +181,11 @@ export class ProducerStream {
       let codec: RtpCodecCapability | undefined;
 
       if (track.kind === "video") {
-        codec = this.device.chooseCodec();
+        codec = this.device.getCodecCapabilites(this.codec);
         if (!codec) {
-          throw Error("Could not find suitable codec!!");
-        }
-        console.info("Chosen codec:", codec);
-
-        for (const cb of this.onChosenCodec) {
-          cb(codec);
+          throw Error(`Server does not support chosen codec: ${this.codec}`);
         }
 
-        // TODO: Check if encoding type is compatible with video format
         if (this.type === EncodingType.SVC) {
           encodings = [{ scalabilityMode: "S3T3" }];
         } else {

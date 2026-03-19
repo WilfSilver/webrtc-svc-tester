@@ -2,6 +2,9 @@ import { Device } from "mediasoup-client";
 import type { RtpCodecCapability } from "mediasoup-client/lib/RtpParameters";
 import type { API, ServerInit } from "./api";
 
+/* Supported codecs on the server */
+export type VideoCodecMimeType = "video/vp9" | "video/av1";
+
 /**
  * Basic wrapper around {@linkcode Device} to handle the initialisation
  */
@@ -23,23 +26,13 @@ export class DeviceWrapper {
 
   /**
    * Chooses the best codec supported by the browser and server
-   *
-   * TODO: Give choice to user
    */
-  chooseCodec(): RtpCodecCapability | undefined {
+  getCodecCapabilites(
+    mimeType: VideoCodecMimeType,
+  ): RtpCodecCapability | undefined {
     console.debug("Supported codecs: ", this.inner.recvRtpCapabilities.codecs);
-    return (
-      this.inner.recvRtpCapabilities.codecs?.find((codec) => {
-        // Firefox supports VP9, but not SVC
-        return codec.mimeType.toLowerCase() === "video/vp9" && !isFirefox();
-      }) ??
-      this.inner.recvRtpCapabilities.codecs?.find(
-        (codec) => codec.mimeType.toLowerCase() === "video/vp8",
-      )
-    );
+    return this.inner.recvRtpCapabilities.codecs?.find((codec) => {
+      return codec.mimeType.toLowerCase() === mimeType;
+    });
   }
-}
-
-function isFirefox(): boolean {
-  return navigator.userAgent.toLowerCase().includes("firefox");
 }

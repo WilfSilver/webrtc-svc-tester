@@ -3,10 +3,10 @@
  */
 
 import { parseScalabilityMode } from "mediasoup-client";
-import type { Consumer, RtpCodecCapability } from "mediasoup-client/lib/types";
+import type { Consumer } from "mediasoup-client/lib/types";
 import { API, type ProducerId } from "../lib/api";
 import { ConsumerStream } from "../lib/consumer";
-import { DeviceWrapper } from "../lib/device";
+import { DeviceWrapper, type VideoCodecMimeType } from "../lib/device";
 import { E2EWorker } from "../lib/e2e_manager";
 import { LayerManager } from "../lib/layer";
 import { ProducerStream } from "../lib/producer";
@@ -45,8 +45,8 @@ class VideoPreview {
   }
 }
 
-function updateOnScreenCodec(codec: RtpCodecCapability) {
-  getVideoCodec().innerText = codec.mimeType?.split("/")[1] ?? "?";
+function updateOnScreenCodec(codec: VideoCodecMimeType) {
+  getVideoCodec().innerText = codec.split("/")[1].toUpperCase() ?? "?";
 }
 
 function updateOnScreenLayers(spatial: number, temporal: number) {
@@ -92,7 +92,7 @@ const e2e = E2EWorker.newWithRandomKey();
 const device = new DeviceWrapper(api);
 
 const producer = new ProducerStream(api, device).withEncryption(e2e);
-producer.addOnChosenCodec(updateOnScreenCodec);
+updateOnScreenCodec(producer.codec);
 
 const consumer = new ConsumerStream(api, device).withEncryption(e2e);
 consumer.addOnNewConsumer(createLayerMgrFor);
