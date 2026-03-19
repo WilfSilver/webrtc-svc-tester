@@ -30,7 +30,6 @@ export enum EncodingType {
  *
  * // Create a producer with end to end encryption
  * const producer = new ProducerStream(api).withEncryption(e2e);
- * producer.addOnChosenCodec(updateOnScreenCodec);
  *
  * // Once configured, we can now connect the API causing the "Init" event
  * api.connect();
