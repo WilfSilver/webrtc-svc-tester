@@ -78,7 +78,7 @@ export class ProducerStream {
   constructor(
     api: API,
     device: DeviceWrapper | undefined,
-    type: EncodingType = EncodingType.SVC,
+    type: EncodingType = EncodingType.Simulcast,
   ) {
     if (!device) device = new DeviceWrapper(api);
 
