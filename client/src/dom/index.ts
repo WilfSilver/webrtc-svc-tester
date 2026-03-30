@@ -4,12 +4,17 @@
 
 import { parseScalabilityMode } from "mediasoup-client";
 import type { Consumer } from "mediasoup-client/lib/types";
-import { API, type ProducerId } from "../lib/api";
+import {
+  API,
+  ServerInit,
+  ServerProducerAdded,
+  ServerProducerRemoved,
+} from "../lib/api";
 import { ConsumerStream } from "../lib/consumer";
 import { DeviceWrapper, type VideoCodecMimeType } from "../lib/device";
-import { E2EWorker } from "../lib/e2e_manager";
 import { LayerManager } from "../lib/layer";
 import { ProducerStream } from "../lib/producer";
+import { Config, ProducerConfig } from "./config";
 
 function getVideoCodec(): HTMLSpanElement {
   return document.querySelector("#video-codec") as HTMLSpanElement;
@@ -64,6 +69,8 @@ function setupLayerBtns(layerMgr: LayerManager) {
     "increase-layer",
   ) as HTMLButtonElement;
   increaseBtn.onclick = () => layerMgr.increase();
+
+  document.getElementById("layer-ctrl")?.classList.remove("hidden");
 }
 
 function createLayerMgrFor(consumer: Consumer) {
@@ -87,41 +94,70 @@ function createLayerMgrFor(consumer: Consumer) {
 }
 
 const api = new API();
-const e2e = E2EWorker.newWithRandomKey();
 
-const device = new DeviceWrapper(api);
+new Config(async (config) => {
+  const e2e = config.e2eWorker();
 
-const producer = new ProducerStream(api, device).withEncryption(e2e);
-updateOnScreenCodec(producer.codec);
+  const device = new DeviceWrapper(api);
 
-const consumer = new ConsumerStream(api, device).withEncryption(e2e);
-consumer.addOnNewConsumer(createLayerMgrFor);
+  if (config instanceof ProducerConfig) {
+    const producer = new ProducerStream(api, device).withEncryption(e2e);
+    updateOnScreenCodec(producer.codec);
 
-const recvPreview = VideoPreview.fromId("preview-receive");
-recvPreview.setSrc(consumer.stream);
+    const producerIdsInp = document.getElementById(
+      "producer-ids-info",
+    ) as HTMLInputElement;
+    producer.addOnNewProducer((p) => {
+      console.log(p.id);
+      if (producerIdsInp.value !== "") producerIdsInp.value += ",";
 
-producer.addOnNewProducer((producer) =>
-  consumer.consume(producer.id as ProducerId),
-);
+      producerIdsInp.value += p.id;
+    });
 
-api.connnect();
+    api.connnect(config.roomId());
 
-const sendPreview = VideoPreview.fromId("preview-send");
+    const sendPreview = VideoPreview.fromId("preview-send");
 
-const mediaStream = await navigator.mediaDevices.getUserMedia({
-  audio: true,
-  video: {
-    width: {
-      ideal: 1280,
-    },
-    height: {
-      ideal: 720,
-    },
-    frameRate: {
-      ideal: 60,
-    },
-  },
+    const mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        width: {
+          ideal: 1280,
+        },
+        height: {
+          ideal: 720,
+        },
+        frameRate: {
+          ideal: 30,
+        },
+      },
+    });
+
+    sendPreview.setSrc(mediaStream);
+    producer.connectStream(mediaStream);
+
+    document.getElementById("producer-info")?.classList.remove("hidden");
+  } else {
+    const consumer = new ConsumerStream(api, device).withEncryption(e2e);
+    consumer.addOnNewConsumer(createLayerMgrFor);
+
+    const recvPreview = VideoPreview.fromId("preview-receive");
+    recvPreview.setSrc(consumer.stream);
+
+    const toConsume = [];
+    api.waitFor("ProducerAdded", (info: ServerProducerAdded) => {
+      console.log({ info });
+      toConsume.push(info.producerId);
+    });
+
+    api.waitFor("Init", (_: ServerInit) => {
+      for (const c of toConsume) consumer.consume(c);
+    });
+
+    api.waitFor("ProducerRemoved", () => {
+      // Ignore Producer I guess
+    });
+
+    api.connnect(config.roomId());
+  }
 });
-
-sendPreview.setSrc(mediaStream);
-producer.connectStream(mediaStream);

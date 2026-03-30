@@ -15,6 +15,7 @@ export type ProducerId = Brand<string, "ProducerId">;
 
 export interface ServerInit {
   action: "Init";
+  room_id: string;
   consumerTransportOptions: TransportOptions;
   producerTransportOptions: TransportOptions;
   routerRtpCapabilities: RtpCapabilities;
@@ -25,8 +26,20 @@ export interface ServerConnectedProducerTransport {
 }
 
 export interface ServerProduced {
-  action: "Produced";
+  action: "ProducerProduced";
   id: ProducerId;
+}
+
+export interface ServerProducerAdded {
+  action: "ProducerAdded";
+  producerId: ProducerId;
+  participantId: string;
+}
+
+export interface ServerProducerRemoved {
+  action: "ProducerRemoved";
+  producerId: ProducerId;
+  participantId: string;
 }
 
 export interface ServerConnectedConsumerTransport {
@@ -36,6 +49,7 @@ export interface ServerConnectedConsumerTransport {
 export interface ServerConsumed {
   action: "Consumed";
   id: ConsumerId;
+  producer_id: ProducerId;
   kind: MediaKind;
   rtpParameters: RtpParameters;
 }
@@ -43,6 +57,8 @@ export interface ServerConsumed {
 export type ServerMessage =
   | ServerInit
   | ServerConnectedProducerTransport
+  | ServerProducerAdded
+  | ServerProducerRemoved
   | ServerProduced
   | ServerConnectedConsumerTransport
   | ServerConsumed;
@@ -107,7 +123,7 @@ type GetServerResponse<T extends ClientMessage> =
       : T extends ClientConnectProducerTransport
         ? ServerConnectedProducerTransport
         : T extends ClientProduce
-          ? ServerProduced
+          ? ServerProducerAdded
           : never;
 
 const clientToServer: {
@@ -188,7 +204,8 @@ export class API {
    *
    * @returns The api object, to allow for combination with the constructor
    */
-  connnect(url: URL = new URL("ws://localhost:3000/ws")): API {
+  connnect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
+    url.searchParams.append("roomId", roomId);
     this.ws = new WebSocket(url.toString());
 
     this.ws.onmessage = async (msg) => {

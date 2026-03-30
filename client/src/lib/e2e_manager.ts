@@ -22,14 +22,10 @@ export class E2EWorker {
   private worker: Worker;
 
   constructor(key: Uint8Array, useOffset: boolean = true) {
-    const stream = new ReadableStream();
-
-    window.postMessage(stream, "*", [stream]);
     this.worker = new Worker("/src/workers/e2e.worker.ts", {
       type: "module",
       name: "e2e worker",
     });
-
     console.info("Setup E2EE worker");
 
     this.worker.postMessage({
@@ -39,8 +35,44 @@ export class E2EWorker {
     } as SetCryptoKey);
   }
 
+  /**
+   * Creates a new encryption transform with a random key.
+   *
+   * NOTE: This still has to be applied to the different layers
+   *
+   * Example usage:
+   *
+   * ```ts
+   * const e2e = E2EWorker.newWithRandomKey();
+   *
+   * const api = new API();
+   * const producer = new ProducerStream(api).withEncryption(e2e);
+   *
+   * // ...
+   * ```
+   */
   static newWithRandomKey(useOffset: boolean = true): E2EWorker {
     return new E2EWorker(randomBytes(32), useOffset);
+  }
+
+  /**
+   * Creates a new encryption transform a provided 32 byte hex string (so 64
+   * characters)
+   *
+   * NOTE: This still has to be applied to the different layers
+   *
+   * ```ts
+   * const key = "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
+   * const e2e = E2EWorker.fromHexKey(key);
+   *
+   * const api = new API();
+   * const producer = new ProducerStream(api).withEncryption(e2e);
+   *
+   * // ...
+   * ```
+   */
+  static fromHexKey(hexString: string, useOffset: boolean = true): E2EWorker {
+    return new E2EWorker(Uint8Array.fromHex(hexString), useOffset);
   }
 
   /**

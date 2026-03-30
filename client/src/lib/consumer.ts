@@ -56,7 +56,7 @@ export class ConsumerStream {
    * @param device The {@linkcode DeviceWrapper} which will be used for
    *   communications
    */
-  constructor(api: API, device: DeviceWrapper | undefined) {
+  constructor(api: API, device: DeviceWrapper | undefined = undefined) {
     if (!device) device = new DeviceWrapper(api);
 
     this.device = device;
@@ -164,6 +164,7 @@ export class ConsumerStream {
           id: consumer?.id as ConsumerId,
         });
 
+        console.log(consumer?.track);
         this.stream.addTrack(consumer?.track);
 
         return consumer;

@@ -17,7 +17,7 @@ export default defineConfig({
     },
     rollupOptions: {
       input: {
-        client: relPath("./src/client.ts"),
+        client: relPath("./src/dom/index.ts"),
         "e2e-worker": relPath("./src/workers/e2e.worker.ts"),
       },
       output: {

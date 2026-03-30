@@ -25,6 +25,10 @@
         .previews {
             display: flex;
         }
+
+        .hidden {
+          display: none;
+        }
     </style>
   </head>
   <body>
@@ -40,14 +44,47 @@
         </figure>
       </div>
 
-      <p>
-        Video codec: <span id="video-codec">?</span>
-      </p>
-      <div>
+      <div class="controls">
+        <select id="video-client">
+          <option value="producer">Producer</option>
+          <option value="consumer">Consumer</option>
+        </select>
+
+        <div id="producer-controls" class="controls">
+          <select id="video-codec">
+            <option value="video/vp9">VP9</option>
+            <option value="video/av1">AV1</option>
+          </select>
+
+          <select id="video-format">
+            <option value="svc">SVC</option>
+            <option value="simulcast">Simulcast</option>
+          </select>
+        </div>
+
+        <div id="consumer-controls" class="controls hidden">
+          <input id="encryption-key" placeholder="Encryption key" />
+        </div>
+
+        <input id="room-id" placeholder="Room ID" />
+
+        <button id="config-submit" type="button">Start</button>
+      </div>
+
+      <div id="producer-info" class="hidden controls">
+        <input disabled id="producer-encryption-key" />
+        <input disabled id="producer-ids-info" />
+      </div>
+
+      <div id="layer-ctrl" class="hidden controls">
         Switch layers: <button id="decrease-layer" type="button">down</button>
         S<span id="spatial">?</span>T<span id="temporal">?</span>
         <button id="increase-layer" type="button">up</button>
       </div>
+
+      <p id="encryption key" class="hidden">
+        Encryption Key: <span id="video-codec">?</span>
+      </p>
     </div>
 
     <script type="module" src="src/dom/index.ts">  </script>
