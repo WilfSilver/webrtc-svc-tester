@@ -8,6 +8,7 @@ import type {
 import type { API, ServerInit } from "./api";
 import { DeviceWrapper, type VideoCodecMimeType } from "./device";
 import type { E2EWorker } from "./e2e_manager";
+import { MetricsLog } from "./metrics";
 
 /**
  * The supported encoding type
@@ -114,6 +115,32 @@ export class ProducerStream {
         e2e.setupSenderTransform(producer.rtpSender);
       }
     });
+
+    return this;
+  }
+
+  /**
+   * Logs the transport data to the given metrics log
+   *
+   * ```ts
+   * const api = new API();
+   * const metrics = new MetricsLog();
+   *
+   * const producer = new ProducerStream(api).withMetrics(metrics);
+   * ```
+   */
+  withMetrics(metrics: MetricsLog): ProducerStream {
+    this.addOnNewProducer((producer) => {
+      metrics.listenTo(producer);
+    });
+
+    if (this.transport) {
+      metrics.listenTo(this.transport);
+    } else {
+      this.api.waitFor("Init", (_) => {
+        if (this.transport) metrics.listenTo(this.transport);
+      });
+    }
 
     return this;
   }

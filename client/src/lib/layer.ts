@@ -87,6 +87,17 @@ export class LayerManager {
     this.onUpdate.push(cb);
   }
 
+  /**
+   * Set the spatial and temporal layers to specific value. The value will be
+   * normalised to be within the bounds of 0 to `this.max(Spatial|Temporal)`
+   */
+  set(spatial: number, temporal: number) {
+    this.temporal = Math.min(Math.max(temporal, 0), this.maxTemporal);
+    this.spatial = Math.min(Math.max(spatial, 0), this.maxSpatial);
+
+    this.updateStream();
+  }
+
   /* Iterates over all the onUpdate callbacks and calls all of them */
   private updateStream() {
     for (const cb of this.onUpdate) {

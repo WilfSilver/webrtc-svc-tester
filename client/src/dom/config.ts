@@ -23,7 +23,6 @@ export class Config {
     };
 
     this.select.onchange = () => {
-      console.log(`Changing ${this.inner.type()} to ${this.select.value}`);
       if (this.inner.type() === this.select.value) return;
 
       this.inner.hide();
@@ -41,9 +40,38 @@ export class Config {
 
 export class BaseConfig {
   roomIdInput: HTMLInputElement;
+  encryptionKeyInput: HTMLInputElement;
 
   constructor() {
     this.roomIdInput = document.getElementById("room-id") as HTMLInputElement;
+
+    this.encryptionKeyInput = document.getElementById(
+      "encryption-key",
+    ) as HTMLInputElement;
+  }
+
+  encryptionKey(): string {
+    return this.encryptionKeyInput.value;
+  }
+
+  e2eWorker(): E2EWorker {
+    const encryptionKey = this.encryptionKey();
+
+    if (encryptionKey === "") {
+      const key = randomBytes(32);
+      console.log(`Key: ${key.toHex()}`);
+
+      this.encryptionKeyInput.value = key.toHex();
+
+      return new E2EWorker(key);
+    }
+
+    return E2EWorker.fromHexKey(encryptionKey);
+  }
+
+  disable() {
+    this.roomIdInput.disabled = true;
+    this.encryptionKeyInput.disabled = true;
   }
 
   roomId(): string {
@@ -52,46 +80,8 @@ export class BaseConfig {
 }
 
 export class ConsumerConfig extends BaseConfig {
-  encryptionKeyInput: HTMLInputElement;
-  div: HTMLDivElement;
-
-  constructor() {
-    super();
-
-    console.log("Creating consumer");
-
-    this.encryptionKeyInput = document.getElementById(
-      "encryption-key",
-    ) as HTMLInputElement;
-
-    this.div = document.getElementById("consumer-controls") as HTMLDivElement;
-    this.show();
-  }
-
-  encryptionKey(): string {
-    return this.encryptionKeyInput.value;
-  }
-
-  e2eWorker(): E2EWorker {
-    return E2EWorker.fromHexKey(this.encryptionKey());
-  }
-
-  disable() {
-    this.encryptionKeyInput.disabled = true;
-  }
-
   type(): "consumer" {
     return "consumer";
-  }
-
-  show() {
-    console.log("Showing consumer");
-    this.div.classList.remove("hidden");
-  }
-
-  hide() {
-    console.log("Hiding consumer");
-    this.div.classList.add("hidden");
   }
 }
 
@@ -102,8 +92,6 @@ export class ProducerConfig extends BaseConfig {
 
   constructor() {
     super();
-
-    console.log("Creating producer");
 
     this.div = document.getElementById("producer-controls") as HTMLDivElement;
     this.codecSelect = document.getElementById(
@@ -128,19 +116,20 @@ export class ProducerConfig extends BaseConfig {
     }
   }
 
-  e2eWorker(): E2EWorker {
-    const key = randomBytes(32);
-    console.log(`Key: ${key.toHex()}`);
-
-    const encKeyInp = document.getElementById(
-      "producer-encryption-key",
-    ) as HTMLInputElement;
-    encKeyInp.value = key.toHex();
-
-    return new E2EWorker(key);
-  }
+  // e2eWorker(): E2EWorker {
+  //   const key = randomBytes(32);
+  //   console.log(`Key: ${key.toHex()}`);
+  //
+  //   const encKeyInp = document.getElementById(
+  //     "producer-encryption-key",
+  //   ) as HTMLInputElement;
+  //   encKeyInp.value = key.toHex();
+  //
+  //   return new E2EWorker(key);
+  // }
 
   disable() {
+    super.disable();
     this.codecSelect.disabled = true;
     this.formatSelect.disabled = true;
   }
@@ -150,12 +139,10 @@ export class ProducerConfig extends BaseConfig {
   }
 
   show() {
-    console.log("Showing producer");
     this.div.classList.remove("hidden");
   }
 
   hide() {
-    console.log("Hiding producer");
     this.div.classList.add("hidden");
   }
 }

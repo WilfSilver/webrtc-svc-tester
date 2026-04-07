@@ -6,13 +6,14 @@ import { parseScalabilityMode } from "mediasoup-client";
 import type { Consumer } from "mediasoup-client/lib/types";
 import {
   API,
-  ServerInit,
-  ServerProducerAdded,
-  ServerProducerRemoved,
+  type ProducerId,
+  type ServerInit,
+  type ServerProducerAdded,
 } from "../lib/api";
 import { ConsumerStream } from "../lib/consumer";
 import { DeviceWrapper, type VideoCodecMimeType } from "../lib/device";
 import { LayerManager } from "../lib/layer";
+import { MetricsLog } from "../lib/metrics";
 import { ProducerStream } from "../lib/producer";
 import { Config, ProducerConfig } from "./config";
 
@@ -89,6 +90,8 @@ function createLayerMgrFor(consumer: Consumer) {
       layerMgr.attachToConsumer(api, consumer);
       layerMgr.addOnUpdate(updateOnScreenLayers);
       setupLayerBtns(layerMgr);
+
+      layerMgr.set(1, 1);
     }
   }
 }
@@ -97,22 +100,15 @@ const api = new API();
 
 new Config(async (config) => {
   const e2e = config.e2eWorker();
+  const metrics = new MetricsLog();
 
   const device = new DeviceWrapper(api);
 
   if (config instanceof ProducerConfig) {
-    const producer = new ProducerStream(api, device).withEncryption(e2e);
+    const producer = new ProducerStream(api, device)
+      .withEncryption(e2e)
+      .withMetrics(metrics);
     updateOnScreenCodec(producer.codec);
-
-    const producerIdsInp = document.getElementById(
-      "producer-ids-info",
-    ) as HTMLInputElement;
-    producer.addOnNewProducer((p) => {
-      console.log(p.id);
-      if (producerIdsInp.value !== "") producerIdsInp.value += ",";
-
-      producerIdsInp.value += p.id;
-    });
 
     api.connnect(config.roomId());
 
@@ -135,16 +131,16 @@ new Config(async (config) => {
 
     sendPreview.setSrc(mediaStream);
     producer.connectStream(mediaStream);
-
-    document.getElementById("producer-info")?.classList.remove("hidden");
   } else {
-    const consumer = new ConsumerStream(api, device).withEncryption(e2e);
+    const consumer = new ConsumerStream(api, device)
+      .withEncryption(e2e)
+      .withMetrics(metrics);
     consumer.addOnNewConsumer(createLayerMgrFor);
 
     const recvPreview = VideoPreview.fromId("preview-receive");
     recvPreview.setSrc(consumer.stream);
 
-    const toConsume = [];
+    const toConsume: ProducerId[] = [];
     api.waitFor("ProducerAdded", (info: ServerProducerAdded) => {
       console.log({ info });
       toConsume.push(info.producerId);

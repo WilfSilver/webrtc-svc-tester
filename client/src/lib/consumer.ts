@@ -2,6 +2,7 @@ import type { Consumer, Transport } from "mediasoup-client/lib/types";
 import type { API, ConsumerId, ProducerId, ServerInit } from "./api";
 import { DeviceWrapper } from "./device";
 import type { E2EWorker } from "./e2e_manager";
+import { MetricsLog } from "./metrics";
 
 /**
  * This class wraps around the creation of all consumers and the resultant
@@ -86,6 +87,35 @@ export class ConsumerStream {
       if (consumer.rtpReceiver)
         e2e.setupReceiverTransform(consumer.rtpReceiver);
     });
+    return this;
+  }
+
+  /**
+   * Logs the transport data to the given metrics log
+   *
+   * NOTE: This needs to be run before {@linkcode consume}, it is
+   * recommended to be run during creation e.g.
+   *
+   * ```ts
+   * const api = new API();
+   * const metrics = new MetricsLog();
+   *
+   * const consumer = new ConsumerStream(api).withMetrics(metrics);
+   * ```
+   */
+  withMetrics(metrics: MetricsLog): ConsumerStream {
+    this.addOnNewConsumer((consumer) => {
+      metrics.listenTo(consumer);
+    });
+
+    if (this.transport) {
+      metrics.listenTo(this.transport);
+    } else {
+      this.api.waitFor("Init", (_) => {
+        if (this.transport) metrics.listenTo(this.transport);
+      });
+    }
+
     return this;
   }
 

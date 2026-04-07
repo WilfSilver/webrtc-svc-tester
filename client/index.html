@@ -35,11 +35,11 @@
     <div id="container">
       <div class="previews">
         <figure>
-          <video id="preview-send" muted controls></video>
+          <video id="preview-send" muted></video>
           <figcaption>Send preview</figcaption>
         </figure>
         <figure>
-          <video id="preview-receive" muted controls></video>
+          <video id="preview-receive" muted></video>
           <figcaption>Receive preview</figcaption>
         </figure>
       </div>
@@ -62,18 +62,13 @@
           </select>
         </div>
 
-        <div id="consumer-controls" class="controls hidden">
-          <input id="encryption-key" placeholder="Encryption key" />
-        </div>
+        <input id="encryption-key" placeholder="Encryption key" />
 
         <input id="room-id" placeholder="Room ID" />
 
         <button id="config-submit" type="button">Start</button>
-      </div>
 
-      <div id="producer-info" class="hidden controls">
-        <input disabled id="producer-encryption-key" />
-        <input disabled id="producer-ids-info" />
+        <button id="metrics-save" type="button">Save Metrics</button>
       </div>
 
       <div id="layer-ctrl" class="hidden controls">
