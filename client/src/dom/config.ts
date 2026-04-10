@@ -75,7 +75,14 @@ export class BaseConfig {
   }
 
   roomId(): string {
-    return this.roomIdInput.value;
+    let id = this.roomIdInput.value;
+
+    if (id === "") {
+      id = crypto.randomUUID();
+      this.roomIdInput.value = id;
+    }
+
+    return id;
   }
 }
 

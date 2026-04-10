@@ -232,25 +232,54 @@ interface Stats {
  */
 export class MetricsLog {
   data: Stats;
+  listeningTo: (Producer | Consumer | Transport)[];
+  paused: boolean = false;
 
-  constructor() {
+  constructor(delay = 200) {
     this.data = {
       producer: [],
       consumer: [],
       transport: [],
     };
 
+    this.listeningTo = [];
+
     const saveBtn = document.getElementById(
       "metrics-save",
     ) as HTMLButtonElement;
 
     saveBtn.onclick = () => this.save();
+
+    setInterval(async () => {
+      if (this.paused) return;
+
+      for (const transport of this.listeningTo)
+        this.log(await transport.getStats());
+    }, delay);
+  }
+
+  reset() {
+    this.data = {
+      producer: [],
+      consumer: [],
+      transport: [],
+    };
+
+    this.listeningTo = [];
+  }
+
+  pause() {
+    this.paused = true;
+  }
+
+  record() {
+    this.paused = false;
   }
 
   /**
    * Downloads a single CSV file with all the data in it from the objects
    */
-  save() {
+  save(name = "metrics") {
     const data = [
       Papa.unparse(this.data.producer, { header: true }),
       Papa.unparse(this.data.consumer, { header: true }),
@@ -261,7 +290,7 @@ export class MetricsLog {
     const a = document.createElement("a");
     const url = URL.createObjectURL(file);
     a.href = url;
-    a.download = "metrics.csv";
+    a.download = `${name}.csv`;
     a.click();
 
     setTimeout(() => window.URL.revokeObjectURL(url), 0);
@@ -272,6 +301,8 @@ export class MetricsLog {
    * "inbound-rtp" and "transport" types
    */
   log(stats: RTCStatsReport) {
+    if (this.paused) return;
+
     for (const [_, vals] of stats) {
       if (vals.type === "outbound-rtp") {
         this.data.producer.push(vals as ProducerStats);
@@ -285,9 +316,9 @@ export class MetricsLog {
 
   /**
    * Listens to a given transport/producer/consumer that has the `getStats`
-   * function and calls it with the given interval.
+   * function and calls Metrics set delay
    */
-  listenTo(transport: Transport | Producer | Consumer, delay = 200) {
-    setInterval(async () => this.log(await transport.getStats()), delay);
+  listenTo(transport: Transport | Producer | Consumer) {
+    this.listeningTo.push(transport);
   }
 }

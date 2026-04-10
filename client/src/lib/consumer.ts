@@ -50,6 +50,8 @@ export class ConsumerStream {
 
   onNewConsumer: ((consumer: Consumer) => void)[];
 
+  producerToTrack: Record<ProducerId, MediaStreamTrack>;
+
   /**
    * Constructs the steam and sets up listeners for the API
    *
@@ -67,6 +69,8 @@ export class ConsumerStream {
     this.onNewConsumer = [];
 
     this.api.waitFor("Init", (msg: ServerInit) => this.init(msg), false);
+
+    this.producerToTrack = {};
   }
 
   /**
@@ -162,6 +166,8 @@ export class ConsumerStream {
    * @returns The consumer created
    */
   async consume(producer: ProducerId): Promise<Consumer> {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
     const transport = this.transport;
     if (!transport) {
       throw Error("Transport was not initialised");
@@ -197,7 +203,21 @@ export class ConsumerStream {
         console.log(consumer?.track);
         this.stream.addTrack(consumer?.track);
 
+        console.log("Producer: ", producer);
+        if (consumer?.track) this.producerToTrack[producer] = consumer?.track;
+
         return consumer;
       });
+  }
+
+  async stopConsumption(producer: ProducerId) {
+    if (producer in this.producerToTrack) {
+      this.stream.removeTrack(this.producerToTrack[producer]);
+      delete this.producerToTrack[producer];
+    }
+  }
+
+  close() {
+    this.transport?.close();
   }
 }

@@ -3,7 +3,7 @@ import type { RtpCodecCapability } from "mediasoup-client/lib/RtpParameters";
 import type { API, ServerInit } from "./api";
 
 /* Supported codecs on the server */
-export type VideoCodecMimeType = "video/vp9" | "video/av1";
+export type VideoCodecMimeType = "video/vp9" | "video/av1" | "video/vp8";
 
 /**
  * Basic wrapper around {@linkcode Device} to handle the initialisation
@@ -18,9 +18,11 @@ export class DeviceWrapper {
 
   private async init(msg: ServerInit) {
     console.log("Initialising device");
-    await this.inner.load({
-      routerRtpCapabilities: msg.routerRtpCapabilities,
-    });
+    await this.inner
+      .load({
+        routerRtpCapabilities: msg.routerRtpCapabilities,
+      })
+      .catch(console.error);
     console.log("Initialised device");
   }
 

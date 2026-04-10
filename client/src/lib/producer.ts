@@ -8,14 +8,14 @@ import type {
 import type { API, ServerInit } from "./api";
 import { DeviceWrapper, type VideoCodecMimeType } from "./device";
 import type { E2EWorker } from "./e2e_manager";
-import { MetricsLog } from "./metrics";
+import type { MetricsLog } from "./metrics";
 
 /**
  * The supported encoding type
  */
 export enum EncodingType {
-  Simulcast,
-  SVC,
+  Simulcast = "simulcast",
+  SVC = "svc",
 }
 
 /**
@@ -160,6 +160,7 @@ export class ProducerStream {
           })
           .then(() => {
             success();
+
             console.log("Producer transport connected");
           });
       })
@@ -194,6 +195,8 @@ export class ProducerStream {
     if (this.producers.length > 0) {
       throw Error("Producers have already been initialised");
     }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     if (!this.transport) {
       throw Error("Transport has not been initialised yet");
@@ -238,5 +241,9 @@ export class ProducerStream {
       }
       console.info(`${track.kind} producer created:`, producer);
     }
+  }
+
+  close() {
+    this.transport?.close();
   }
 }

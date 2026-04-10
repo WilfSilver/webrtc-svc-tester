@@ -6,16 +6,16 @@ import { parseScalabilityMode } from "mediasoup-client";
 import type { Consumer } from "mediasoup-client/lib/types";
 import {
   API,
-  type ProducerId,
-  type ServerInit,
+  type ServerProducerRemoved,
   type ServerProducerAdded,
 } from "../lib/api";
 import { ConsumerStream } from "../lib/consumer";
 import { DeviceWrapper, type VideoCodecMimeType } from "../lib/device";
 import { LayerManager } from "../lib/layer";
 import { MetricsLog } from "../lib/metrics";
-import { ProducerStream } from "../lib/producer";
+import { EncodingType, ProducerStream } from "../lib/producer";
 import { Config, ProducerConfig } from "./config";
+import imgUrl from "../assets/videos/Sintel_720_10s_5MB.mp4";
 
 function getVideoCodec(): HTMLSpanElement {
   return document.querySelector("#video-codec") as HTMLSpanElement;
@@ -35,10 +35,6 @@ class VideoPreview {
   constructor(elem: HTMLVideoElement) {
     this.elem = elem;
 
-    this.elem.onloadedmetadata = () => {
-      this.elem.play();
-    };
-
     console.info(`Initialised ${this.elem.id}`);
   }
 
@@ -46,8 +42,33 @@ class VideoPreview {
     return new VideoPreview(document.getElementById(id) as HTMLVideoElement);
   }
 
-  setSrc(src: MediaStream) {
+  onEnd(cb: () => void) {
+    this.elem.addEventListener("ended", cb);
+  }
+
+  reset() {
+    this.elem.pause();
+    this.elem.currentTime = 0;
+  }
+
+  setSrc(src: MediaStream | null) {
     this.elem.srcObject = src;
+  }
+
+  setSrcUrl(src: string) {
+    this.elem.src = src;
+  }
+
+  capture(): MediaStream {
+    return (this.elem as unknown as HTMLCanvasElement).captureStream();
+  }
+
+  play() {
+    this.elem.play();
+  }
+
+  finished(): Promise<undefined> {
+    return new Promise((resolve) => this.onEnd(() => resolve(undefined)));
   }
 }
 
@@ -91,48 +112,82 @@ function createLayerMgrFor(consumer: Consumer) {
       layerMgr.addOnUpdate(updateOnScreenLayers);
       setupLayerBtns(layerMgr);
 
-      layerMgr.set(1, 1);
+      const [_codec, _encType, spatial, temporal] = tests[testNum];
+      layerMgr.set(spatial, temporal);
     }
   }
 }
 
 const api = new API();
 
+const tests: [VideoCodecMimeType, EncodingType, number, number][] = [
+  // ["video/av1", EncodingType.SVC, 0, 0],
+  // ["video/av1", EncodingType.SVC, 0, 1],
+  // ["video/av1", EncodingType.SVC, 0, 2],
+  // ["video/av1", EncodingType.SVC, 1, 0],
+  // ["video/av1", EncodingType.SVC, 1, 1],
+  // ["video/av1", EncodingType.SVC, 1, 2],
+  // ["video/av1", EncodingType.SVC, 2, 0],
+  // ["video/av1", EncodingType.SVC, 2, 1],
+  // ["video/av1", EncodingType.SVC, 2, 2],
+
+  ["video/vp9", EncodingType.SVC, 0, 0],
+  ["video/vp9", EncodingType.SVC, 0, 1],
+  ["video/vp9", EncodingType.SVC, 0, 2],
+  ["video/vp9", EncodingType.SVC, 1, 0],
+  ["video/vp9", EncodingType.SVC, 1, 1],
+  ["video/vp9", EncodingType.SVC, 1, 2],
+  ["video/vp9", EncodingType.SVC, 2, 0],
+  ["video/vp9", EncodingType.SVC, 2, 1],
+  ["video/vp9", EncodingType.SVC, 2, 2],
+
+  ["video/vp9", EncodingType.Simulcast, 0, 0],
+  ["video/vp9", EncodingType.Simulcast, 0, 1],
+  ["video/vp9", EncodingType.Simulcast, 0, 2],
+
+  // ["video/av1", EncodingType.Simulcast, 0, 0],
+  // ["video/av1", EncodingType.Simulcast, 0, 1],
+  // ["video/av1", EncodingType.Simulcast, 0, 2],
+];
+
+let testNum = 0;
+
 new Config(async (config) => {
   const e2e = config.e2eWorker();
   const metrics = new MetricsLog();
-
-  const device = new DeviceWrapper(api);
+  metrics.pause();
 
   if (config instanceof ProducerConfig) {
-    const producer = new ProducerStream(api, device)
-      .withEncryption(e2e)
-      .withMetrics(metrics);
-    updateOnScreenCodec(producer.codec);
+    for (const [codec, encType, spatial, temporal] of tests) {
+      const device = new DeviceWrapper(api);
 
-    api.connnect(config.roomId());
+      const producer = new ProducerStream(api, device, codec, encType)
+        .withEncryption(e2e)
+        .withMetrics(metrics);
+      updateOnScreenCodec(producer.codec);
 
-    const sendPreview = VideoPreview.fromId("preview-send");
+      api.connect(config.roomId());
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        width: {
-          ideal: 1280,
-        },
-        height: {
-          ideal: 720,
-        },
-        frameRate: {
-          ideal: 30,
-        },
-      },
-    });
+      const sendPreview = VideoPreview.fromId("preview-send");
 
-    sendPreview.setSrc(mediaStream);
-    producer.connectStream(mediaStream);
+      sendPreview.setSrcUrl(imgUrl);
+      await producer.connectStream(sendPreview.capture());
+      metrics.record();
+      sendPreview.play();
+
+      await sendPreview.finished();
+      metrics.pause();
+      metrics.save(`producer-${codec}-${encType}-${spatial}-${temporal}`);
+      metrics.reset();
+
+      producer.close();
+      api.disconnect();
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
   } else {
-    const consumer = new ConsumerStream(api, device)
+    const consumer = new ConsumerStream(api)
       .withEncryption(e2e)
       .withMetrics(metrics);
     consumer.addOnNewConsumer(createLayerMgrFor);
@@ -140,20 +195,41 @@ new Config(async (config) => {
     const recvPreview = VideoPreview.fromId("preview-receive");
     recvPreview.setSrc(consumer.stream);
 
-    const toConsume: ProducerId[] = [];
+    let playing = false;
     api.waitFor("ProducerAdded", (info: ServerProducerAdded) => {
-      console.log({ info });
-      toConsume.push(info.producerId);
+      consumer.consume(info.producerId);
+
+      if (!playing) {
+        recvPreview.play();
+        metrics.record();
+        playing = true;
+      }
     });
 
-    api.waitFor("Init", (_: ServerInit) => {
-      for (const c of toConsume) consumer.consume(c);
+    api.waitFor("ProducerRemoved", async (info: ServerProducerRemoved) => {
+      console.log("ProducerRemoved", info);
+      if (playing) {
+        console.log("Pausing metrics");
+        metrics.pause();
+
+        // recvPreview.setSrc(null);
+        recvPreview.elem.currentTime = 0;
+      }
+
+      await consumer.stopConsumption(info.producerId);
+
+      if (playing) {
+        console.log("Saving metrics");
+        const [codec, encType, spatial, temporal] = tests[testNum];
+        metrics.save(`consumer-${codec}-${encType}-${spatial}-${temporal}`);
+
+        metrics.reset();
+
+        playing = false;
+        testNum++;
+      }
     });
 
-    api.waitFor("ProducerRemoved", () => {
-      // Ignore Producer I guess
-    });
-
-    api.connnect(config.roomId());
+    api.connect(config.roomId());
   }
 });

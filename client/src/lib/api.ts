@@ -181,6 +181,8 @@ export class API {
    */
   private nextListenerId: number;
 
+  private initParams?: ServerInit;
+
   /**
    * Constructs new {@linkcode API} object
    *
@@ -204,7 +206,7 @@ export class API {
    *
    * @returns The api object, to allow for combination with the constructor
    */
-  connnect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
+  connect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
     url.searchParams.append("roomId", roomId);
     this.ws = new WebSocket(url.toString());
 
@@ -215,7 +217,22 @@ export class API {
 
     this.ws.onerror = console.error;
 
+    // Save the init params so we can auto run any functions waiting on init
+    this.waitFor("Init", (params: ServerInit) => {
+      this.initParams = params;
+    });
+
     return this;
+  }
+
+  reconnect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
+    this.ws?.close();
+    return this.connect(roomId, url);
+  }
+
+  disconnect() {
+    this.ws?.close();
+    this.ws = undefined;
   }
 
   /**
@@ -326,6 +343,11 @@ export class API {
       const map = new Map();
       map.set(id, cb);
       this.listeners.set(action, map);
+    }
+
+    // Automatically call init on the new params
+    if (action === "Init" && this.initParams) {
+      this.handle(this.initParams);
     }
 
     return id;
