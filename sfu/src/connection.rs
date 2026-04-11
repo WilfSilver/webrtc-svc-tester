@@ -80,11 +80,11 @@ impl ParticipantConnection {
         let transport_options =
             WebRtcTransportOptions::new(WebRtcTransportListenInfos::new(ListenInfo {
                 protocol: Protocol::Udp,
-                ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
-                announced_address: None,
+                ip: IpAddr::V4(std::env::var("HOST").ok().and_then(|h| h.parse::<Ipv4Addr>().ok()).unwrap_or(Ipv4Addr::LOCALHOST)),
+                announced_address: std::env::var("ANNOUNCED_ADDRESS").ok(),
                 expose_internal_ip: false,
                 port: None,
-                port_range: None,
+                port_range: Some(10000..=10005),
                 flags: None,
                 send_buffer_size: None,
                 recv_buffer_size: None,
@@ -322,7 +322,7 @@ impl Handler<ClientMessage> for ParticipantConnection {
                     }
                 });
             }
-            ClientMessage::Consume { producer_id } => {
+            ClientMessage::Consume { producer_id, preferred_layers } => {
                 let participant_id = self.id;
                 let address = ctx.address();
                 let transport = self.transports.consumer.clone();
@@ -340,6 +340,7 @@ impl Handler<ClientMessage> for ParticipantConnection {
                 // capabilities were sent by the client prior to that
                 actix::spawn(async move {
                     let mut options = ConsumerOptions::new(producer_id, rtp_capabilities);
+                    options.preferred_layers = preferred_layers;
                     options.paused = true;
 
                     match transport.consume(options).await {

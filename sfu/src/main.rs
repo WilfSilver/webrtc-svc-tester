@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::web::{Data, Payload, Query};
 use actix_web::{App, Error, HttpRequest, HttpResponse, HttpServer, web};
 use actix_web_actors::ws;
@@ -114,7 +115,8 @@ async fn ws_index(
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    println!("Binding to: 127.0.0.1:3000");
+    let host = std::env::var("HOST").unwrap_or("127.0.0.1".to_string());
+    println!("Binding to: {host}:3000");
 
     // We will reuse the same worker manager across all connections, this is more than enough for
     // this use case
@@ -122,7 +124,10 @@ async fn main() -> std::io::Result<()> {
     let rooms_registry = Data::new(RoomsRegistry::default());
 
     HttpServer::new(move || {
+        let cors = Cors::default().allow_any_origin().allow_any_method().allow_any_header();
+
         App::new()
+            .wrap(cors)
             // .app_data(worker_manager.clone())
             .app_data(worker_manager.clone())
             .app_data(rooms_registry.clone())
@@ -130,7 +135,7 @@ async fn main() -> std::io::Result<()> {
     })
     // 2 threads is plenty for this example, default is to have as many threads as CPU cores
     .workers(2)
-    .bind("127.0.0.1:3000")?
+    .bind(format!("{host}:3000"))?
     .run()
     .await
 }
