@@ -26,7 +26,7 @@ export interface ServerConnectedProducerTransport {
 }
 
 export interface ServerProduced {
-  action: "ProducerProduced";
+  action: "Produced";
   id: ProducerId;
 }
 
@@ -84,9 +84,15 @@ export interface ClientProduce {
   rtpParameters: RtpParameters;
 }
 
+export interface PreferredLayers {
+  spatialLayer: number;
+  temporalLayer: number;
+}
+
 export interface ClientConsume {
   action: "Consume";
   producerId: ProducerId;
+  preferredLayers: PreferredLayers | null;
 }
 
 export interface ClientConsumerResume {
@@ -97,10 +103,7 @@ export interface ClientConsumerResume {
 export interface ClientSetConsumerPreferredLayers {
   action: "SetConsumerPreferredLayers";
   id: ConsumerId;
-  preferredLayers: {
-    spatialLayer: number;
-    temporalLayer: number;
-  };
+  preferredLayers: PreferredLayers;
 }
 
 export type ClientMessagesWithResponse =
@@ -123,7 +126,7 @@ type GetServerResponse<T extends ClientMessage> =
       : T extends ClientConnectProducerTransport
         ? ServerConnectedProducerTransport
         : T extends ClientProduce
-          ? ServerProducerAdded
+          ? ServerProduced
           : never;
 
 const clientToServer: {

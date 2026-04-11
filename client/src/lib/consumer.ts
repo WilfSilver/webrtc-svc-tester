@@ -1,5 +1,11 @@
 import type { Consumer, Transport } from "mediasoup-client/lib/types";
-import type { API, ConsumerId, ProducerId, ServerInit } from "./api";
+import type {
+  API,
+  ConsumerId,
+  PreferredLayers,
+  ProducerId,
+  ServerInit,
+} from "./api";
 import { DeviceWrapper } from "./device";
 import type { E2EWorker } from "./e2e_manager";
 import { MetricsLog } from "./metrics";
@@ -165,7 +171,10 @@ export class ConsumerStream {
    *
    * @returns The consumer created
    */
-  async consume(producer: ProducerId): Promise<Consumer> {
+  async consume(
+    producer: ProducerId,
+    preferredLayers: PreferredLayers | null,
+  ): Promise<Consumer> {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     const transport = this.transport;
@@ -177,6 +186,7 @@ export class ConsumerStream {
       .sendAndWait({
         action: "Consume",
         producerId: producer,
+        preferredLayers,
       })
       .then(async (msg) => {
         // Once confirmation is received, corresponding consumer

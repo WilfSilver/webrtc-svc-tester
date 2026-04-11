@@ -58,6 +58,8 @@ pub struct ParticipantConnection {
     /// Room to which the client belongs
     room: Room,
 
+    handlers: Vec<HandlerId>,
+
     /// Event handlers that were attached and need to be removed when participant connection is
     /// destroyed
     attached_handlers: Vec<HandlerId>,
@@ -104,6 +106,7 @@ impl ParticipantConnection {
             client_rtp_capabilities: None,
             consumers: HashMap::new(),
             producers: vec![],
+            handlers: vec![],
             transports: Transports {
                 consumer: consumer_transport,
                 producer: producer_transport,
@@ -448,7 +451,11 @@ impl Handler<InternalMessage> for ParticipantConnection {
                 self.producers.push(producer);
             }
             InternalMessage::SaveConsumer(consumer) => {
+                let h = consumer.on_layers_change(|layers| {
+                    println!("New layers: {:?}", layers);
+                });
                 self.consumers.insert(consumer.id(), consumer);
+                self.handlers.push(h);
             }
         }
     }

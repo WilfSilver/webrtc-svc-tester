@@ -24,8 +24,8 @@ export class LayerManager {
   constructor(maxSpatial: number, maxTemporal: number) {
     console.info(`Initialising Layer control (${maxSpatial}, ${maxTemporal})`);
 
-    this.maxSpatial = maxSpatial + 1;
-    this.maxTemporal = maxTemporal + 1;
+    this.maxSpatial = maxSpatial;
+    this.maxTemporal = maxTemporal;
 
     this.spatial = maxSpatial;
     this.temporal = maxTemporal;
@@ -92,8 +92,8 @@ export class LayerManager {
    * normalised to be within the bounds of 0 to `this.max(Spatial|Temporal)`
    */
   set(spatial: number, temporal: number) {
-    this.temporal = Math.min(Math.max(temporal, 0), this.maxTemporal);
-    this.spatial = Math.min(Math.max(spatial, 0), this.maxSpatial);
+    this.temporal = Math.min(Math.max(temporal, 0), this.maxTemporal - 1);
+    this.spatial = Math.min(Math.max(spatial, 0), this.maxSpatial - 1);
 
     this.updateStream();
   }

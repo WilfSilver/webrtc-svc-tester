@@ -4,50 +4,74 @@ import type { VideoCodecMimeType } from "../lib/device";
 import { E2EWorker } from "../lib/e2e_manager";
 import { EncodingType } from "../lib/producer";
 
+interface ConfigParams {
+  type: "producer" | "consumer" | null;
+  roomId: string | null;
+  encryptionKey: string | null;
+  submit: string | null;
+  testNum: number | null;
+}
+
 export class Config {
-  inner: ProducerConfig | ConsumerConfig;
   select: HTMLSelectElement;
   submit: HTMLButtonElement;
 
-  constructor(onsubmit: (config: ProducerConfig | ConsumerConfig) => void) {
-    this.inner = new ProducerConfig();
+  roomIdInput: HTMLInputElement;
+  encryptionKeyInput: HTMLInputElement;
+  testNum: number = 0;
 
+  constructor(onsubmit: (config: Config) => void) {
     this.select = document.getElementById("video-client") as HTMLSelectElement;
     this.submit = document.getElementById("config-submit") as HTMLButtonElement;
 
     this.submit.onclick = () => {
-      this.inner.disable();
+      this.disable();
       this.select.disabled = true;
       this.submit.disabled = true;
-      onsubmit(this.inner);
+      onsubmit(this);
     };
 
-    this.select.onchange = () => {
-      if (this.inner.type() === this.select.value) return;
-
-      this.inner.hide();
-      switch (this.select.value) {
-        case "producer":
-          this.inner = new ProducerConfig();
-          break;
-        case "consumer":
-          this.inner = new ConsumerConfig();
-          break;
-      }
-    };
-  }
-}
-
-export class BaseConfig {
-  roomIdInput: HTMLInputElement;
-  encryptionKeyInput: HTMLInputElement;
-
-  constructor() {
     this.roomIdInput = document.getElementById("room-id") as HTMLInputElement;
 
     this.encryptionKeyInput = document.getElementById(
       "encryption-key",
     ) as HTMLInputElement;
+
+    const params = new URL(document.location.toString()).searchParams;
+    this.set({
+      type: params.get("type") as "producer" | "consumer" | null,
+      roomId: params.get("roomId"),
+      encryptionKey: params.get("encryptionKey"),
+      submit: params.get("submit"),
+      testNum:
+        params.get("testNum") !== null ? Number(params.get("testNum")) : null,
+    });
+  }
+
+  set(config: ConfigParams) {
+    this.select.value = config.type ?? "producer";
+    this.roomIdInput.value = config.roomId ?? "";
+    this.encryptionKeyInput.value = config.encryptionKey ?? "";
+
+    this.testNum = config.testNum ?? 0;
+
+    if (config.submit) this.submit.click();
+  }
+
+  asParams(submit: boolean, testNum?: number): URLSearchParams {
+    const params = new URLSearchParams();
+
+    params.set("type", this.type());
+    params.set("roomId", this.roomId());
+    params.set("encryptionKey", this.encryptionKey());
+    params.set("submit", String(submit));
+    params.set("testNum", String(testNum ?? this.testNum));
+
+    return params;
+  }
+
+  type(): "producer" | "consumer" {
+    return this.select.value as "producer" | "consumer";
   }
 
   encryptionKey(): string {
@@ -83,73 +107,5 @@ export class BaseConfig {
     }
 
     return id;
-  }
-}
-
-export class ConsumerConfig extends BaseConfig {
-  type(): "consumer" {
-    return "consumer";
-  }
-}
-
-export class ProducerConfig extends BaseConfig {
-  codecSelect: HTMLSelectElement;
-  formatSelect: HTMLSelectElement;
-  div: HTMLDivElement;
-
-  constructor() {
-    super();
-
-    this.div = document.getElementById("producer-controls") as HTMLDivElement;
-    this.codecSelect = document.getElementById(
-      "video-codec",
-    ) as HTMLSelectElement;
-    this.formatSelect = document.getElementById(
-      "video-format",
-    ) as HTMLSelectElement;
-    this.show();
-  }
-
-  codec(): VideoCodecMimeType {
-    return this.codecSelect.value as VideoCodecMimeType;
-  }
-
-  format(): EncodingType {
-    switch (this.formatSelect.value) {
-      case "simulcast":
-        return EncodingType.Simulcast;
-      default:
-        return EncodingType.SVC;
-    }
-  }
-
-  // e2eWorker(): E2EWorker {
-  //   const key = randomBytes(32);
-  //   console.log(`Key: ${key.toHex()}`);
-  //
-  //   const encKeyInp = document.getElementById(
-  //     "producer-encryption-key",
-  //   ) as HTMLInputElement;
-  //   encKeyInp.value = key.toHex();
-  //
-  //   return new E2EWorker(key);
-  // }
-
-  disable() {
-    super.disable();
-    this.codecSelect.disabled = true;
-    this.formatSelect.disabled = true;
-  }
-
-  type(): "producer" {
-    return "producer";
-  }
-
-  show() {
-    this.div.classList.remove("hidden");
-  }
-
-  hide() {
-    this.div.classList.add("hidden");
   }
 }

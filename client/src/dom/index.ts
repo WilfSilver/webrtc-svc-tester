@@ -15,7 +15,7 @@ import { LayerManager } from "../lib/layer";
 import { MetricsLog } from "../lib/metrics";
 import { EncodingType, ProducerStream } from "../lib/producer";
 import { Config, ProducerConfig } from "./config";
-import imgUrl from "../assets/videos/Sintel_720_10s_5MB.mp4";
+import imgUrl from "../assets/videos/sample-webm-files-sample_1920x1080.webm";
 
 function getVideoCodec(): HTMLSpanElement {
   return document.querySelector("#video-codec") as HTMLSpanElement;
@@ -121,15 +121,25 @@ function createLayerMgrFor(consumer: Consumer) {
 const api = new API();
 
 const tests: [VideoCodecMimeType, EncodingType, number, number][] = [
-  // ["video/av1", EncodingType.SVC, 0, 0],
-  // ["video/av1", EncodingType.SVC, 0, 1],
-  // ["video/av1", EncodingType.SVC, 0, 2],
-  // ["video/av1", EncodingType.SVC, 1, 0],
-  // ["video/av1", EncodingType.SVC, 1, 1],
-  // ["video/av1", EncodingType.SVC, 1, 2],
-  // ["video/av1", EncodingType.SVC, 2, 0],
-  // ["video/av1", EncodingType.SVC, 2, 1],
-  // ["video/av1", EncodingType.SVC, 2, 2],
+  ["video/av1", EncodingType.SVC, 0, 0],
+  ["video/av1", EncodingType.SVC, 0, 1],
+  ["video/av1", EncodingType.SVC, 0, 2],
+  ["video/av1", EncodingType.SVC, 1, 0],
+  ["video/av1", EncodingType.SVC, 1, 1],
+  ["video/av1", EncodingType.SVC, 1, 2],
+  ["video/av1", EncodingType.SVC, 2, 0],
+  ["video/av1", EncodingType.SVC, 2, 1],
+  ["video/av1", EncodingType.SVC, 2, 2],
+
+  ["video/av1", EncodingType.Simulcast, 0, 0],
+  ["video/av1", EncodingType.Simulcast, 0, 1],
+  ["video/av1", EncodingType.Simulcast, 0, 2],
+  ["video/av1", EncodingType.Simulcast, 1, 0],
+  ["video/av1", EncodingType.Simulcast, 1, 1],
+  ["video/av1", EncodingType.Simulcast, 1, 2],
+  ["video/av1", EncodingType.Simulcast, 2, 0],
+  ["video/av1", EncodingType.Simulcast, 2, 1],
+  ["video/av1", EncodingType.Simulcast, 2, 2],
 
   ["video/vp9", EncodingType.SVC, 0, 0],
   ["video/vp9", EncodingType.SVC, 0, 1],
@@ -144,10 +154,12 @@ const tests: [VideoCodecMimeType, EncodingType, number, number][] = [
   ["video/vp9", EncodingType.Simulcast, 0, 0],
   ["video/vp9", EncodingType.Simulcast, 0, 1],
   ["video/vp9", EncodingType.Simulcast, 0, 2],
-
-  // ["video/av1", EncodingType.Simulcast, 0, 0],
-  // ["video/av1", EncodingType.Simulcast, 0, 1],
-  // ["video/av1", EncodingType.Simulcast, 0, 2],
+  ["video/vp9", EncodingType.Simulcast, 1, 0],
+  ["video/vp9", EncodingType.Simulcast, 1, 1],
+  ["video/vp9", EncodingType.Simulcast, 1, 2],
+  ["video/vp9", EncodingType.Simulcast, 2, 0],
+  ["video/vp9", EncodingType.Simulcast, 2, 1],
+  ["video/vp9", EncodingType.Simulcast, 2, 2],
 ];
 
 let testNum = 0;
@@ -157,36 +169,48 @@ new Config(async (config) => {
   const metrics = new MetricsLog();
   metrics.pause();
 
-  if (config instanceof ProducerConfig) {
-    for (const [codec, encType, spatial, temporal] of tests) {
-      const device = new DeviceWrapper(api);
+  testNum = config.testNum;
 
-      const producer = new ProducerStream(api, device, codec, encType)
-        .withEncryption(e2e)
-        .withMetrics(metrics);
-      updateOnScreenCodec(producer.codec);
+  const [codec, encType, spatial, temporal] = tests[testNum];
 
-      api.connect(config.roomId());
-      await new Promise((resolve) => setTimeout(resolve, 100));
+  if (config.type() === "producer") {
+    const device = new DeviceWrapper(api);
 
-      const sendPreview = VideoPreview.fromId("preview-send");
+    const producer = new ProducerStream(api, device, codec, encType)
+      .withEncryption(e2e)
+      .withMetrics(metrics);
+    updateOnScreenCodec(producer.codec);
 
-      sendPreview.setSrcUrl(imgUrl);
-      await producer.connectStream(sendPreview.capture());
-      metrics.record();
-      sendPreview.play();
+    api.connect(config.roomId());
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-      await sendPreview.finished();
-      metrics.pause();
-      metrics.save(`producer-${codec}-${encType}-${spatial}-${temporal}`);
-      metrics.reset();
+    const sendPreview = VideoPreview.fromId("preview-send");
 
-      producer.close();
-      api.disconnect();
+    sendPreview.setSrcUrl(imgUrl);
+    await producer.connectStream(sendPreview.capture());
+    metrics.record();
+    sendPreview.play();
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    await sendPreview.finished();
+    metrics.pause();
+    metrics.save(`producer-${codec}-${encType}-${spatial}-${temporal}`);
+    metrics.reset();
+
+    producer.close();
+    api.disconnect();
+
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    if (testNum + 1 < tests.length) {
+      const url = new URL(window.location.toString());
+      url.search = config.asParams(true, testNum + 1).toString();
+      window.location.replace(url);
     }
   } else {
+    const url = new URL(window.location.toString());
+    url.search = config.asParams(true).toString();
+    url.searchParams.set("type", "producer");
+    (document.getElementById("pair") as HTMLLinkElement).href = url.toString();
     const consumer = new ConsumerStream(api)
       .withEncryption(e2e)
       .withMetrics(metrics);
@@ -197,7 +221,10 @@ new Config(async (config) => {
 
     let playing = false;
     api.waitFor("ProducerAdded", (info: ServerProducerAdded) => {
-      consumer.consume(info.producerId);
+      consumer.consume(info.producerId, {
+        spatialLayer: spatial,
+        temporalLayer: temporal,
+      });
 
       if (!playing) {
         recvPreview.play();
@@ -220,13 +247,17 @@ new Config(async (config) => {
 
       if (playing) {
         console.log("Saving metrics");
-        const [codec, encType, spatial, temporal] = tests[testNum];
         metrics.save(`consumer-${codec}-${encType}-${spatial}-${temporal}`);
 
         metrics.reset();
 
         playing = false;
-        testNum++;
+
+        if (testNum + 1 < tests.length) {
+          const url = new URL(window.location.toString());
+          url.search = config.asParams(true, testNum + 1).toString();
+          window.location.replace(url);
+        }
       }
     });
 

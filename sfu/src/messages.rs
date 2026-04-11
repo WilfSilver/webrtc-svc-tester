@@ -92,7 +92,7 @@ pub enum ClientMessage {
     ConnectConsumerTransport { dtls_parameters: DtlsParameters },
     /// Request to consume specified producer
     #[serde(rename_all = "camelCase")]
-    Consume { producer_id: ProducerId },
+    Consume { producer_id: ProducerId, preferred_layers: Option<ConsumerLayers> },
     /// Request to resume consumer that was previously created
     #[serde(rename_all = "camelCase")]
     ConsumerResume { id: ConsumerId },
