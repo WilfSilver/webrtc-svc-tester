@@ -202,7 +202,9 @@ new Config(async (config) => {
 
   const endTest = () => {
     const { codec, encType, spatial, temporal } = testInfo();
-    metrics.save(`${config.type()}-${codec}-${encType}-${spatial}-${temporal}`);
+    metrics.save(
+      `${testNum}-${config.type()}-${codec}-${encType}-${spatial}-${temporal}`,
+    );
     metrics.reset();
   };
 
