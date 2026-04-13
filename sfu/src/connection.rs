@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, fmt, net::{IpAddr, Ipv4Addr}
+    collections::HashMap, fmt, net::{IpAddr, Ipv4Addr}, sync::{atomic, Arc}
 };
 
 use actix::{Actor, ActorContext, AsyncContext, Handler, StreamHandler};
@@ -58,8 +58,6 @@ pub struct ParticipantConnection {
     /// Room to which the client belongs
     room: Room,
 
-    handlers: Vec<HandlerId>,
-
     /// Event handlers that were attached and need to be removed when participant connection is
     /// destroyed
     attached_handlers: Vec<HandlerId>,
@@ -106,7 +104,6 @@ impl ParticipantConnection {
             client_rtp_capabilities: None,
             consumers: HashMap::new(),
             producers: vec![],
-            handlers: vec![],
             transports: Transports {
                 consumer: consumer_transport,
                 producer: producer_transport,
@@ -178,6 +175,7 @@ impl Actor for ParticipantConnection {
                 });
             }
         }));
+
 
         // Notify client about any producers that already exist in the room
         for (participant_id, producer_id) in self.room.get_all_producers() {
@@ -456,7 +454,7 @@ impl Handler<InternalMessage> for ParticipantConnection {
                     println!("New layers: {:?}", layers);
                 });
                 self.consumers.insert(consumer.id(), consumer);
-                self.handlers.push(h);
+                self.attached_handlers.push(h);
             }
         }
     }

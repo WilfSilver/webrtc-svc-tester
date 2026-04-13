@@ -14,11 +14,11 @@ import { DeviceWrapper, type VideoCodecMimeType } from "../lib/device";
 import { LayerManager } from "../lib/layer";
 import { MetricsLog } from "../lib/metrics";
 import { EncodingType, ProducerStream } from "../lib/producer";
-import { Config, ProducerConfig } from "./config";
+import { Config } from "./config";
 import imgUrl from "../assets/videos/sample-webm-files-sample_1920x1080.webm";
 
 function getVideoCodec(): HTMLSpanElement {
-  return document.querySelector("#video-codec") as HTMLSpanElement;
+  return document.getElementById("video-codec") as HTMLSpanElement;
 }
 
 function getSpatialSpan(): HTMLSpanElement {
@@ -112,13 +112,42 @@ function createLayerMgrFor(consumer: Consumer) {
       layerMgr.addOnUpdate(updateOnScreenLayers);
       setupLayerBtns(layerMgr);
 
-      const [_codec, _encType, spatial, temporal] = tests[testNum];
+      const { spatial, temporal } = testInfo();
       layerMgr.set(spatial, temporal);
     }
   }
 }
 
+function showStreamInfo(stream: MediaStream) {
+  setInterval(() => {
+    const settings = stream.getTracks().at(0)?.getSettings();
+    if (settings) {
+      (document.getElementById("framerate") as HTMLSpanElement).innerText =
+        `${settings?.frameRate?.toPrecision(3) ?? "0"}fps`;
+      (document.getElementById("resolution") as HTMLSpanElement).innerText =
+        `${settings?.width}x${settings?.height}`;
+
+      document.getElementById("stream-info")?.classList.remove("hidden");
+    } else {
+      document.getElementById("stream-info")?.classList.add("hidden");
+    }
+  }, 500);
+}
+
 const api = new API();
+
+const TEST_EPOCH = 10;
+
+function testInfo(): {
+  codec: VideoCodecMimeType;
+  encType: EncodingType;
+  spatial: number;
+  temporal: number;
+} {
+  const [codec, encType, spatial, temporal] = tests[testNum % tests.length];
+
+  return { codec, encType, spatial, temporal };
+}
 
 const tests: [VideoCodecMimeType, EncodingType, number, number][] = [
   ["video/av1", EncodingType.SVC, 0, 0],
@@ -162,6 +191,8 @@ const tests: [VideoCodecMimeType, EncodingType, number, number][] = [
   ["video/vp9", EncodingType.Simulcast, 2, 2],
 ];
 
+const MAX_TESTS = tests.length * TEST_EPOCH;
+
 let testNum = 0;
 
 new Config(async (config) => {
@@ -169,12 +200,18 @@ new Config(async (config) => {
   const metrics = new MetricsLog();
   metrics.pause();
 
-  testNum = config.testNum;
+  const endTest = () => {
+    const { codec, encType, spatial, temporal } = testInfo();
+    metrics.save(`${config.type()}-${codec}-${encType}-${spatial}-${temporal}`);
+    metrics.reset();
+  };
 
-  const [codec, encType, spatial, temporal] = tests[testNum];
+  testNum = config.testNum;
 
   if (config.type() === "producer") {
     const device = new DeviceWrapper(api);
+
+    const { codec, encType } = testInfo();
 
     const producer = new ProducerStream(api, device, codec, encType)
       .withEncryption(e2e)
@@ -184,24 +221,26 @@ new Config(async (config) => {
     api.connect(config.roomId());
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const sendPreview = VideoPreview.fromId("preview-send");
+    const sendPreview = VideoPreview.fromId("preview");
 
     sendPreview.setSrcUrl(imgUrl);
-    await producer.connectStream(sendPreview.capture());
+
+    const stream = sendPreview.capture();
+    showStreamInfo(stream);
+    await producer.connectStream(stream);
     metrics.record();
     sendPreview.play();
 
     await sendPreview.finished();
     metrics.pause();
-    metrics.save(`producer-${codec}-${encType}-${spatial}-${temporal}`);
-    metrics.reset();
+    endTest();
 
     producer.close();
     api.disconnect();
 
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
-    if (testNum + 1 < tests.length) {
+    if (testNum + 1 < MAX_TESTS) {
       const url = new URL(window.location.toString());
       url.search = config.asParams(true, testNum + 1).toString();
       window.location.replace(url);
@@ -216,11 +255,15 @@ new Config(async (config) => {
       .withMetrics(metrics);
     consumer.addOnNewConsumer(createLayerMgrFor);
 
-    const recvPreview = VideoPreview.fromId("preview-receive");
+    const recvPreview = VideoPreview.fromId("preview");
     recvPreview.setSrc(consumer.stream);
+
+    showStreamInfo(consumer.stream);
 
     let playing = false;
     api.waitFor("ProducerAdded", (info: ServerProducerAdded) => {
+      const { spatial, temporal } = testInfo();
+
       consumer.consume(info.producerId, {
         spatialLayer: spatial,
         temporalLayer: temporal,
@@ -247,13 +290,12 @@ new Config(async (config) => {
 
       if (playing) {
         console.log("Saving metrics");
-        metrics.save(`consumer-${codec}-${encType}-${spatial}-${temporal}`);
 
-        metrics.reset();
+        endTest();
 
         playing = false;
 
-        if (testNum + 1 < tests.length) {
+        if (testNum + 1 < MAX_TESTS) {
           const url = new URL(window.location.toString());
           url.search = config.asParams(true, testNum + 1).toString();
           window.location.replace(url);

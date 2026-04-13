@@ -304,6 +304,8 @@ export class MetricsLog {
     if (this.paused) return;
 
     for (const [_, vals] of stats) {
+      if (vals.trackIdentifier === "probator") continue;
+
       if (vals.type === "outbound-rtp") {
         this.data.producer.push(vals as ProducerStats);
       } else if (vals.type === "inbound-rtp") {

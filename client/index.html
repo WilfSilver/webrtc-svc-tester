@@ -2,73 +2,45 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-
-    <style>
-        body {
-            margin: 0;
-        }
-
-        #container {
-            display: flex;
-            flex-direction: column;
-        }
-
-        figure {
-            margin: 0;
-            width: 50vw;
-        }
-
-        video {
-            max-width: 100%;
-        }
-
-        .previews {
-            display: flex;
-        }
-
-        .hidden {
-          display: none;
-        }
-    </style>
+    <link href="/src/style.css" rel="stylesheet">
   </head>
-  <body>
-    <div id="container">
-      <div class="previews">
+  <body class="w-full grid place-content-center h-dvh">
+    <div class="min-w-3xl border m-4 p-2 rounded-xl">
+      <div class="w-full mb-5">
         <figure>
-          <video id="preview-send" muted></video>
-          <figcaption>Send preview</figcaption>
+          <figcaption class="text-xl font-bold">Preview</figcaption>
+          <video id="preview" class="m-auto border rounded-xl" muted></video>
         </figure>
-        <figure>
-          <video id="preview-receive" muted></video>
-          <figcaption>Receive preview</figcaption>
-        </figure>
+        <div id="stream-info" class="flex place-content-end gap-1 mt-2 hidden">
+          <span id="resolution" class="rounded-lg bg-amber-200 p-1">0x0</span>
+          <span id="framerate" class="rounded-lg p-1 bg-rose-200">0fps</span>
+          <span id="video-codec" class="rounded-lg p-1 bg-teal-200">VP9</span>
+        </div>
       </div>
 
-      <div class="controls">
-        <select id="video-client">
+      <div class="grid gap-2">
+        <select id="video-client" class="p-2 border rounded-xl disabled:bg-gray-200">
           <option value="producer">Producer</option>
           <option value="consumer">Consumer</option>
         </select>
 
-        <input id="encryption-key" placeholder="Encryption key" />
+        <div class="grid grid-cols-2 gap-2">
+          <input id="encryption-key" class="p-2 border rounded-xl disabled:bg-gray-200" placeholder="Encryption key" />
+          <input id="room-id" class="p-2 border rounded-xl disabled:bg-gray-200" placeholder="Room ID" />
+        </div>
 
-        <input id="room-id" placeholder="Room ID" />
-
-        <button id="config-submit" type="button">Start</button>
-
-        <button id="metrics-save" type="button">Save Metrics</button>
-        <a id="pair" target="_blank">Open Pair</a>
+        <div class="flex gap-2 place-items-center place-content-end">
+          <a id="pair" target="_blank" class="underline text-blue-800 p-2 hover:text-blue-600 cursor-pointer">Open Pair</a>
+          <button id="metrics-save" type="button" class="p-2 rounded-xl border cursor-pointer hover:bg-gray-200 disabled:bg-gray-400">Save Metrics</button>
+          <button id="config-submit" type="button" class="p-2 rounded-xl cursor-pointer bg-lime-300 hover:bg-lime-500 disabled:bg-lime-400 disabled:cursor-not-allowed">Start</button>
+        </div>
       </div>
 
-      <div id="layer-ctrl" class="hidden controls">
-        Switch layers: <button id="decrease-layer" type="button">down</button>
+      <div id="layer-ctrl" class="hidden">
+        Switch layers: <button id="decrease-layer" type="button" class="cursor-pointer border rounded-lg p-2 hover:bg-gray-200">down</button>
         S<span id="spatial">?</span>T<span id="temporal">?</span>
-        <button id="increase-layer" type="button">up</button>
+        <button id="increase-layer" type="button" class="cursor-pointer border rounded-lg p-2 hover:bg-gray-200">up</button>
       </div>
-
-      <p id="encryption key" class="hidden">
-        Encryption Key: <span id="video-codec">?</span>
-      </p>
     </div>
 
     <script type="module" src="src/dom/index.ts">  </script>

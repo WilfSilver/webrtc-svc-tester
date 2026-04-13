@@ -8,6 +8,8 @@ import type {
   TransportOptions,
 } from "mediasoup-client/lib/Transport";
 
+const HOST = import.meta.env.VITE_HOST ?? "localhostl";
+
 export type Brand<K, T> = K & { __brand: T };
 
 export type ConsumerId = Brand<string, "ConsumerId">;
@@ -209,7 +211,7 @@ export class API {
    *
    * @returns The api object, to allow for combination with the constructor
    */
-  connect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
+  connect(roomId: string, url: URL = new URL(`ws://${HOST}:3000/ws`)): API {
     url.searchParams.append("roomId", roomId);
     this.ws = new WebSocket(url.toString());
 
@@ -228,7 +230,7 @@ export class API {
     return this;
   }
 
-  reconnect(roomId: string, url: URL = new URL("ws://localhost:3000/ws")): API {
+  reconnect(roomId: string, url: URL = new URL(`ws://${HOST}:3000/ws`)): API {
     this.ws?.close();
     return this.connect(roomId, url);
   }

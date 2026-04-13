@@ -1,5 +1,6 @@
 import path from "node:path";
 import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 function relPath(p) {
   return path.resolve(__dirname, p);
@@ -27,4 +28,7 @@ export default defineConfig({
     emptyOutDir: true,
     reportCompressedSize: true,
   },
+  plugins: [
+    tailwindcss(),
+  ]
 });

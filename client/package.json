@@ -12,7 +12,9 @@
   "author": "Wilf Silver <git@wilfsilver.co.uk>",
   "dependencies": {
     "@noble/ciphers": "^2.1.1",
-    "mediasoup-client": "^3.6.51"
+    "@tailwindcss/vite": "^4.2.2",
+    "mediasoup-client": "^3.6.51",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
