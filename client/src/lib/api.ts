@@ -8,7 +8,7 @@ import type {
   TransportOptions,
 } from "mediasoup-client/lib/Transport";
 
-const HOST = import.meta.env.VITE_HOST ?? "localhostl";
+const HOST = import.meta.env.VITE_HOST ?? "localhost";
 
 export type Brand<K, T> = K & { __brand: T };
 
