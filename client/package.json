@@ -11,15 +11,15 @@
   "type": "module",
   "author": "Wilf Silver <git@wilfsilver.co.uk>",
   "dependencies": {
-    "@noble/ciphers": "^2.1.1",
+    "@noble/ciphers": "^2.2.0",
     "@tailwindcss/vite": "^4.2.2",
     "mediasoup-client": "^3.6.51",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "ts-loader": "^9.2.8",
+    "@types/node": "^25.6.0",
+    "ts-loader": "^9.5.7",
     "typescript": "^6.0.2",
-    "vite": "^8.0.3"
+    "vite": "^8.0.8"
   }
 }
