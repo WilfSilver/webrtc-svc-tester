@@ -221,10 +221,19 @@ interface TransportStats {
   packetsSent: number;
 }
 
+interface ConsumerStreamInfo {
+  timestamp: number;
+  framerate: number | undefined;
+  height: number | undefined;
+  width: number | undefined;
+  track: number;
+}
+
 interface Stats {
   producer: ProducerStats[];
   consumer: ConsumerStats[];
   transport: TransportStats[];
+  stream: ConsumerStreamInfo[];
 }
 
 /**
@@ -232,7 +241,7 @@ interface Stats {
  */
 export class MetricsLog {
   data: Stats;
-  listeningTo: (Producer | Consumer | Transport)[];
+  listeningTo: (Producer | Consumer | Transport | MediaStream)[];
   paused: boolean = false;
 
   constructor(delay = 200) {
@@ -240,6 +249,7 @@ export class MetricsLog {
       producer: [],
       consumer: [],
       transport: [],
+      stream: [],
     };
 
     this.listeningTo = [];
@@ -250,12 +260,28 @@ export class MetricsLog {
 
     saveBtn.onclick = () => this.save();
 
-    setInterval(async () => {
-      if (this.paused) return;
+    setInterval(async () => this.logAllListeners(), delay);
+  }
 
-      for (const transport of this.listeningTo)
-        this.log(await transport.getStats());
-    }, delay);
+  async logAllListeners() {
+    if (this.paused) return;
+
+    for (const listener of this.listeningTo) {
+      if (listener instanceof MediaStream) {
+        for (const [i, t] of listener.getTracks().entries()) {
+          const settings = t.getSettings();
+          this.logStream({
+            track: i,
+            timestamp: Date.now(),
+            framerate: settings.frameRate,
+            width: settings.width,
+            height: settings.height,
+          });
+        }
+      } else {
+        this.log(await listener.getStats());
+      }
+    }
   }
 
   reset() {
@@ -263,6 +289,7 @@ export class MetricsLog {
       producer: [],
       consumer: [],
       transport: [],
+      stream: [],
     };
 
     this.listeningTo = [];
@@ -284,6 +311,7 @@ export class MetricsLog {
       Papa.unparse(this.data.producer, { header: true }),
       Papa.unparse(this.data.consumer, { header: true }),
       Papa.unparse(this.data.transport, { header: true }),
+      Papa.unparse(this.data.stream, { header: true }),
     ].join("\n\n");
 
     const file = new Blob([data], { type: "text/csv" });
@@ -309,6 +337,9 @@ export class MetricsLog {
       if (vals.type === "outbound-rtp") {
         this.data.producer.push(vals as ProducerStats);
       } else if (vals.type === "inbound-rtp") {
+        if (!("frameHeight" in vals)) {
+          vals.frameHeight = 1;
+        }
         this.data.consumer.push(vals as ConsumerStats);
       } else if (vals.type === "transport") {
         this.data.transport.push(vals as TransportStats);
@@ -316,11 +347,16 @@ export class MetricsLog {
     }
   }
 
+  logStream(stats: ConsumerStreamInfo) {
+    if (this.paused) return;
+    this.data.stream.push(stats);
+  }
+
   /**
    * Listens to a given transport/producer/consumer that has the `getStats`
    * function and calls Metrics set delay
    */
-  listenTo(transport: Transport | Producer | Consumer) {
+  listenTo(transport: Transport | Producer | Consumer | MediaStream) {
     this.listeningTo.push(transport);
   }
 }

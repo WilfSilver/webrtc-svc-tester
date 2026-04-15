@@ -74,6 +74,7 @@ class VideoPreview {
 
 function updateOnScreenCodec(codec: VideoCodecMimeType) {
   getVideoCodec().innerText = codec.split("/")[1].toUpperCase() ?? "?";
+  getVideoCodec().classList.remove("hidden");
 }
 
 function updateOnScreenLayers(spatial: number, temporal: number) {
@@ -200,7 +201,9 @@ new Config(async (config) => {
   const metrics = new MetricsLog();
   metrics.pause();
 
-  const endTest = () => {
+  const endTest = async () => {
+    await metrics.logAllListeners();
+
     const { codec, encType, spatial, temporal } = testInfo();
     metrics.save(
       `${testNum}-${config.type()}-${codec}-${encType}-${spatial}-${temporal}`,
@@ -228,6 +231,7 @@ new Config(async (config) => {
     sendPreview.setSrcUrl(imgUrl);
 
     const stream = sendPreview.capture();
+    metrics.listenTo(stream);
     showStreamInfo(stream);
     await producer.connectStream(stream);
     metrics.record();
@@ -235,7 +239,7 @@ new Config(async (config) => {
 
     await sendPreview.finished();
     metrics.pause();
-    endTest();
+    await endTest();
 
     producer.close();
     api.disconnect();
@@ -260,6 +264,7 @@ new Config(async (config) => {
     const recvPreview = VideoPreview.fromId("preview");
     recvPreview.setSrc(consumer.stream);
 
+    metrics.listenTo(consumer.stream);
     showStreamInfo(consumer.stream);
 
     let playing = false;
@@ -293,7 +298,7 @@ new Config(async (config) => {
       if (playing) {
         console.log("Saving metrics");
 
-        endTest();
+        await endTest();
 
         playing = false;
 
