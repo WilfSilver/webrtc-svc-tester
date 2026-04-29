@@ -71,7 +71,7 @@ let currentCryptoKey: Uint8Array | undefined;
 let useCryptoOffset = true;
 let currentKeyIdentifier = 0;
 
-/* TODO: Check different format requirements
+/**
  *
  * We need to make sure we are not encrypting information about keyframes, if
  * `cryptoOffset` is set to `true`.

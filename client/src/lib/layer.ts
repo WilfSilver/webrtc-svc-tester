@@ -19,6 +19,10 @@ export class LayerManager {
   /* The current selected temporal layer */
   private temporal: number;
 
+  /**
+   * The callbacks executed when there is an update to the spatial and temporal
+   * layers
+   */
   onUpdate: LayerUpdateCb[];
 
   constructor(maxSpatial: number, maxTemporal: number) {

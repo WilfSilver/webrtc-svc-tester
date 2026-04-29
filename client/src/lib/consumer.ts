@@ -48,14 +48,21 @@ import { MetricsLog } from "./metrics";
  * ```
  */
 export class ConsumerStream {
+  /** The API to use for communication */
   api: API;
+
+  /** The transport object created with parameters from the server */
   transport?: Transport;
+  /** The device used for receiving the stream */
   device: DeviceWrapper;
 
+  /** The final output stream */
   stream: MediaStream;
 
+  /** List of callacks executed when a new consumer is added */
   onNewConsumer: ((consumer: Consumer) => void)[];
 
+  /** Cache to keep track of the producers consumed and their associated tracks */
   producerToTrack: Record<ProducerId, MediaStreamTrack>;
 
   /**
@@ -65,7 +72,7 @@ export class ConsumerStream {
    * @param device The {@linkcode DeviceWrapper} which will be used for
    *   communications
    */
-  constructor(api: API, device: DeviceWrapper | undefined = undefined) {
+  constructor(api: API, device?: DeviceWrapper) {
     if (!device) device = new DeviceWrapper(api);
 
     this.device = device;
@@ -220,6 +227,11 @@ export class ConsumerStream {
       });
   }
 
+  /**
+   * Stops the consumption of a producer
+   *
+   * @param producer The UUID associated with the producer which should not be consumed any longer
+   */
   async stopConsumption(producer: ProducerId) {
     if (producer in this.producerToTrack) {
       this.stream.removeTrack(this.producerToTrack[producer]);
@@ -227,6 +239,7 @@ export class ConsumerStream {
     }
   }
 
+  /* Closes the transport */
   close() {
     this.transport?.close();
   }

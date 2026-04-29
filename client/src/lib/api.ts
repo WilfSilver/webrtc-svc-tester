@@ -186,6 +186,10 @@ export class API {
    */
   private nextListenerId: number;
 
+  /**
+   * The parameters sent by the server on initialisation, allowing for sending
+   * `Init` for any new listener after it has been sent.
+   */
   private initParams?: ServerInit;
 
   /**
@@ -206,6 +210,7 @@ export class API {
   /**
    * Connects to the chosen websocket
    *
+   * @param roomId The UUID of the room to join
    * @param url The full URL to the websocket, expected with `ws://`
    * or `wss://`
    *
@@ -217,7 +222,7 @@ export class API {
 
     this.ws.onmessage = async (msg) => {
       const decodedMessage: ServerMessage = JSON.parse(msg.data);
-      this.handle(decodedMessage);
+      await this.handle(decodedMessage);
     };
 
     this.ws.onerror = console.error;
@@ -230,11 +235,24 @@ export class API {
     return this;
   }
 
+  /**
+   * Disconnects and reconnects the websocket, allowing for changing rooms.
+   *
+   * @param roomId The UUID of the room to join
+   * @param url The full URL to the websocket, expected with `ws://`
+   * or `wss://`
+   *
+   * @returns The api object, to allow for combination with the constructor
+   */
   reconnect(roomId: string, url: URL = new URL(`ws://${HOST}:3000/ws`)): API {
     this.ws?.close();
     return this.connect(roomId, url);
   }
 
+  /**
+   * Disconnects from the websocket and sets it to undefined to stop any
+   * further actions.
+   */
   disconnect() {
     this.ws?.close();
     this.ws = undefined;

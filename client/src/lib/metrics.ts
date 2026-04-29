@@ -240,8 +240,11 @@ interface Stats {
  * Allows the listening and recording of metrics at certain intervals
  */
 export class MetricsLog {
+  /** The raw data being collected */
   data: Stats;
+  /** The objects that are being recorded */
   listeningTo: (Producer | Consumer | Transport | MediaStream)[];
+  /** Whether metrics are being collected or not */
   paused: boolean = false;
 
   constructor(delay = 200) {
@@ -263,6 +266,9 @@ export class MetricsLog {
     setInterval(async () => this.logAllListeners(), delay);
   }
 
+  /**
+   * Logs all objects within the {@link listeningTo} attribute
+   */
   async logAllListeners() {
     if (this.paused) return;
 
@@ -284,6 +290,7 @@ export class MetricsLog {
     }
   }
 
+  /** Resets all the metrics and all listeners */
   reset() {
     this.data = {
       producer: [],
@@ -295,10 +302,12 @@ export class MetricsLog {
     this.listeningTo = [];
   }
 
+  /** Pauses the metrics recording */
   pause() {
     this.paused = true;
   }
 
+  /** Resumes the metrics recording */
   record() {
     this.paused = false;
   }

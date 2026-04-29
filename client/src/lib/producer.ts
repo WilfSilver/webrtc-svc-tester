@@ -55,14 +55,22 @@ export enum EncodingType {
  * ```
  */
 export class ProducerStream {
+  /** The API to use for communication */
   api: API;
+
+  /** The transport object created with parameters from the server */
   transport?: Transport;
+  /** The device used for sending the stream */
   device: DeviceWrapper;
 
+  /** Either SVC or Simulcast which is used to send the stream */
   type: EncodingType;
+  /** The video codec format that is used to send the stream */
   codec: VideoCodecMimeType;
 
+  /** All the callbacks that get executed when a new producer is added */
   onNewProducer: ((producer: Producer<AppData>) => void)[];
+  /** A list of all the producers */
   producers: Producer<AppData>[];
 
   /**
@@ -72,12 +80,10 @@ export class ProducerStream {
    * @param device The {@linkcode DeviceWrapper} which will be used for
    *   communications
    * @param type The type of encoding to be used for communications
-   *
-   * TODO: Fix the encoding type
    */
   constructor(
     api: API,
-    device: DeviceWrapper | undefined,
+    device?: DeviceWrapper,
     codec: VideoCodecMimeType = "video/vp9",
     type: EncodingType = EncodingType.SVC,
   ) {
@@ -243,6 +249,7 @@ export class ProducerStream {
     }
   }
 
+  /** Closes the transport object */
   close() {
     this.transport?.close();
   }

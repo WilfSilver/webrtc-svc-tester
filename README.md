@@ -2,7 +2,7 @@
 
 This code is a work in progress building towards creating a basic E2EE video calling application with support of SVC and Simulcast. This will then be used to test the benefits and downsides of either solution.
 
-Code was originally taken from the [mediasoup's example directories](https://github.com/versatica/mediasoup/tree/v3/rust/examples).
+Code was originally taken from the [mediasoup's example directories](https://github.com/versatica/mediasoup/tree/v3/rust/examples) and has been modified to fit the needs of the project.
 
 ## Supported Browsers
 
